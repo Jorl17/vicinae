@@ -158,6 +158,13 @@
 			"enabled": false
 		},
 
+		// With fit_to_content, vicinae draws the window only as tall as the rows of a list and the status bar, up to the
+		// configured height, as Alfred does. The rest of the window is transparent and the window keeps its size, so
+		// the search bar does not move. Other views, the action panel and an empty list use the full height.
+		"fit_to_content": {
+			"enabled": false
+		},
+
 		// The vicinae UI is designed to work best at the default size. If you change this it is highly recommended
 		// that you preserve a similar aspect ratio.
 		"size": {

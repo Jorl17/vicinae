@@ -133,6 +133,15 @@ Flickable {
             }
 
             SettingsRow {
+                label: qsTr("Fit to content")
+                description: qsTr("Draw the window only as tall as its rows and status bar. The rest of the window is transparent, so the search bar does not move.")
+                SettingsToggle {
+                    checked: root.model.fitToContent
+                    onToggled: checked => root.model.fitToContent = checked
+                }
+            }
+
+            SettingsRow {
                 visible: Style.configurableStatusBar
                 label: qsTr("Floating status bar")
                 description: qsTr("Let the status bar float over the content, which stays slightly visible under it. Disable to keep the content strictly above the status bar.")

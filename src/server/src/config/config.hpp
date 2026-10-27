@@ -114,6 +114,16 @@ template <> struct Partial<WindowCompactMode> {
   std::optional<bool> enabled;
 };
 
+// Draw the launcher window only as tall as the rows of a list view, and leave the
+// rest of the window transparent.
+struct WindowFitToContent {
+  bool enabled = false;
+};
+
+template <> struct Partial<WindowFitToContent> {
+  std::optional<bool> enabled;
+};
+
 struct ClockConfig {
 #ifdef Q_OS_MACOS
   bool enabled = false;
@@ -148,6 +158,7 @@ struct WindowConfig {
   std::string screen;
   BlurConfig blur;
   WindowCompactMode compactMode;
+  WindowFitToContent fitToContent;
   bool floatingStatusBar = true;
   LayerShellConfig layerShell;
   ClockConfig clock;
@@ -211,6 +222,7 @@ template <> struct Partial<WindowConfig> {
   std::optional<Partial<Size>> size;
   std::optional<Partial<BlurConfig>> blur;
   std::optional<Partial<WindowCompactMode>> compactMode;
+  std::optional<Partial<WindowFitToContent>> fitToContent;
   std::optional<bool> floatingStatusBar;
   std::optional<Partial<LayerShellConfig>> layerShell;
   std::optional<std::string> material;

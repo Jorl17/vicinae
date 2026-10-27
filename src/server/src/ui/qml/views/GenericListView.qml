@@ -33,6 +33,10 @@ Item {
     readonly property bool _showDetail: root.detailComponent !== null && root.detailVisible
     readonly property bool _empty: listView.count === 0
     readonly property bool _awaitingData: root.listModel && root.listModel.awaitingData === true
+    // The height that shows every row, from the top of this view, for the
+    // fit_to_content window setting. -1 when the view shows something else
+    // than its rows.
+    readonly property real fittedHeight: root._empty || root._showDetail ? -1 : listView.contentHeight + listView.topMargin - viewport.topInset + listView.bottomMargin
 
     // When true, GenericListView auto-wires common model signals:
     //  - onModelReset → selectFirst + setSelectedIndex

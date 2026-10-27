@@ -145,6 +145,13 @@ void GeneralSettingsModel::setCompactMode(bool v) {
                                   .compactMode = config::Partial<config::WindowCompactMode>{.enabled = v}}});
 }
 
+bool GeneralSettingsModel::fitToContent() const { return cfg().launcherWindow.fitToContent.enabled; }
+void GeneralSettingsModel::setFitToContent(bool v) {
+  cfgManager().mergeWithUser(
+      {.launcherWindow = config::Partial<config::WindowConfig>{
+           .fitToContent = config::Partial<config::WindowFitToContent>{.enabled = v}}});
+}
+
 bool GeneralSettingsModel::floatingStatusBar() const { return cfg().launcherWindow.floatingStatusBar; }
 void GeneralSettingsModel::setFloatingStatusBar(bool v) {
   cfgManager().mergeWithUser(

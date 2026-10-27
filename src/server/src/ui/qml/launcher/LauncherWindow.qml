@@ -35,7 +35,24 @@ LauncherWindowBase {
 
     readonly property int _w: Launcher.overrideWidth || Config.windowWidth
     readonly property int _h: Launcher.overrideHeight || Config.windowHeight
-    readonly property int _contentH: Launcher.compacted ? root.appearance.searchBarHeight + 2 * root.appearance.contentInset : root._h
+    readonly property int _compactH: root.appearance.searchBarHeight + 2 * root.appearance.contentInset
+    // With fit_to_content, we draw the window only as tall as the rows of a list view
+    // and the status bar, up to the configured height, and leave the rest of it
+    // transparent. The window keeps its size, so the search bar stays in place. The
+    // action panel and the footer panel need the full height.
+    readonly property real _viewFittedHeight: {
+        const view = root.commandView;
+        // qmllint disable missing-property
+        return view && typeof view.fittedHeight === "number" ? view.fittedHeight : -1;
+        // qmllint enable missing-property
+    }
+    readonly property bool _fitted: Config.fitToContent && !Launcher.compacted && !Launcher.hasOverlay && !Launcher.actionPanel.open && !Launcher.footerPanel.open && root._viewFittedHeight >= 0
+    readonly property int _fittedH: {
+        const page = commandStack.currentItem as LauncherPage;
+        const needed = root.appearance.contentInset + contentViewport.y + (page?.topInset ?? 0) + root._viewFittedHeight + contentClip.anchors.bottomMargin + root.appearance.contentInset;
+        return Math.min(root._h, Math.max(root._compactH, Math.ceil(needed)));
+    }
+    readonly property int _contentH: Launcher.compacted ? root._compactH : root._fitted ? root._fittedH : root._h
     readonly property int expandedHeight: root._h + 2 * shadowPadding
 
     width: root._w + 2 * shadowPadding
@@ -51,7 +68,7 @@ LauncherWindowBase {
 
     WindowMaterial.enabled: root.blurEnabled && !root.nativeChrome
     WindowMaterial.radius: root.cornerRadius
-    WindowMaterial.region: Qt.rect(shadowPadding, shadowPadding, root._w, Launcher.compacted ? root._contentH : root._h)
+    WindowMaterial.region: Qt.rect(shadowPadding, shadowPadding, root._w, root._contentH)
 
     Item {
         id: shadowMask
@@ -98,7 +115,7 @@ LauncherWindowBase {
         x: root.shadowPadding
         y: root.shadowPadding
         width: root._w
-        height: root._h
+        height: Launcher.compacted ? root._h : root._contentH
 
         Rectangle {
             visible: Launcher.compacted
@@ -123,7 +140,7 @@ LauncherWindowBase {
         Rectangle {
             visible: !Launcher.compacted
             width: root._w
-            height: root._h
+            height: root._contentH
             radius: root.cornerRadius
             color: root.appearance.windowBackground
         }
@@ -154,6 +171,7 @@ LauncherWindowBase {
                 Layout.fillHeight: true
 
                 Item {
+                    id: contentClip
                     anchors.fill: parent
                     anchors.bottomMargin: (root.contentEffect === null || !root.appearance.floatingStatusBar) && floatingStatusBar.visible ? floatingStatusBar.height - root.appearance.contentInset : 0
                     clip: true
