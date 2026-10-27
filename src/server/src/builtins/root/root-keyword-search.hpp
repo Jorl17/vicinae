@@ -3,8 +3,11 @@
 #include "ui/views/section-source.hpp"
 #include <QCoreApplication>
 #include <QObject>
+#include <QTimer>
 #include <cstdint>
+#include <expected>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -15,38 +18,65 @@ class ExtensionManager;
 class RootItemManager;
 class ServiceRegistry;
 
-/* The rows that the keyword handler of an extension command returned for the
- * text in the root search, for example the answer of "calc 2*3". */
-struct KeywordResults {
+/* The row that we show for a keyword before its handler returns rows, for
+ * example "calc" with the subtitle "expr [using calc]". */
+struct KeywordPlaceholder {
+  QString title;
+  QString subtitle;
+};
+
+/* What the root search shows for the keyword of an extension command: the rows
+ * that its keyword handler returned for the last query, or the placeholder row
+ * when there are no rows yet. */
+struct KeywordState {
   std::shared_ptr<ExtensionCommand> command;
   std::vector<manager::KeywordItem> items;
+  std::optional<KeywordPlaceholder> placeholder;
 };
 
 /* Run the keyword handlers of extension commands for the text in the root
- * search. When the text starts with the keyword of an enabled command and a
- * space, we send the rest of the text to the handler of that command and emit
- * resultsReady with its rows. We ignore the rows of a query when the text
- * changed while the handler ran. */
+ * search, with the keyword options of the command (see
+ * ExtensionManifest::Keyword). setText returns what to show at once, and
+ * stateChanged gives the rows when the handler returns them. */
 class RootKeywordSearch : public QObject {
   Q_OBJECT
 
 signals:
-  void resultsReady(const KeywordResults &results) const;
+  void stateChanged(const KeywordState &state) const;
 
 public:
   explicit RootKeywordSearch(const ServiceRegistry &services, QObject *parent = nullptr);
 
-  /* Start a query for `text`. Return the command whose keyword starts the text,
-   * or nullptr when there is none. */
-  std::shared_ptr<ExtensionCommand> setQuery(std::string_view text);
+  const KeywordState &setText(std::string_view text);
 
 private:
+  struct Match {
+    std::shared_ptr<ExtensionCommand> command;
+    // The text after the keyword, or nullopt when the argument is required and missing.
+    std::optional<std::string> query;
+  };
+
   void indexCommands();
+  std::optional<Match> match(std::string_view text) const;
+  void sendPendingQuery();
+  void handleReply(std::uint64_t id, std::uint64_t generation,
+                   const std::shared_ptr<ExtensionCommand> &command,
+                   std::expected<manager::KeywordRows, std::string> result);
 
   const ServiceRegistry &m_services;
   RootItemManager *m_rootItems;
   ExtensionManager *m_extensions;
   std::unordered_map<std::string, std::shared_ptr<ExtensionCommand>> m_commands;
+
+  KeywordState m_state;
+  // Whether the current text asks for rows, which it does not while a required argument is missing.
+  bool m_wantsRows = false;
+  std::optional<std::string> m_pendingQuery;
+  QTimer m_queueDelay;
+  // The id of the query that the handler runs, or 0.
+  std::uint64_t m_runningQuery = 0;
+  std::uint64_t m_lastQueryId = 0;
+  // Changes with every change of the text.
   std::uint64_t m_generation = 0;
 };
 
@@ -55,7 +85,7 @@ class RootKeywordSection : public SectionSource {
 
 public:
   QString sectionName() const override;
-  int count() const override { return static_cast<int>(m_results.items.size()); }
+  int count() const override;
   QString itemId(int i) const override;
   QString itemTitle(int i) const override;
   QString itemSubtitle(int i) const override;
@@ -65,11 +95,11 @@ public:
   QHash<int, QVariant> customRoleDefaults() const override;
   std::unique_ptr<ActionPanelState> actionPanel(int i) const override;
 
-  void setResults(KeywordResults results) { m_results = std::move(results); }
-  const std::shared_ptr<ExtensionCommand> &command() const { return m_results.command; }
+  void setState(KeywordState state) { m_state = std::move(state); }
 
 private:
   const manager::KeywordItem *item(int i) const;
+  bool showsPlaceholder() const { return m_state.items.empty() && m_state.placeholder.has_value(); }
 
-  KeywordResults m_results;
+  KeywordState m_state;
 };

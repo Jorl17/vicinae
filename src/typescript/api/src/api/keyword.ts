@@ -6,6 +6,11 @@
  * the handler with the query on every key press and shows the rows it returns
  * above the other results. Enter runs the first action of the selected row.
  *
+ * The `keywordOptions` field of the command sets whether the query is required,
+ * whether a space must follow the keyword, the row that Vicinae shows before the
+ * handler returns, and when to run the handler, with the meaning of the same
+ * settings of an Alfred script filter.
+ *
  * This is a Vicinae extension of the Raycast API.
  */
 

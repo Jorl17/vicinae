@@ -4,6 +4,7 @@
 #include "vicinae.hpp"
 #include <QJsonObject>
 #include <QJsonDocument>
+#include <algorithm>
 #include <charconv>
 
 namespace fs = std::filesystem;
@@ -185,6 +186,41 @@ static std::expected<std::chrono::seconds, QString> parseInterval(const std::str
   return secs;
 }
 
+ExtensionManifest::Keyword ExtensionManifest::parseKeyword(const QString &word, const QJsonObject &options) {
+  Keyword keyword{.word = word};
+
+  const auto optionalString = [&](QStringView name) -> std::optional<QString> {
+    if (!options.value(name).isString()) return std::nullopt;
+    return options.value(name).toString();
+  };
+
+  if (auto argument = options.value("argument").toString(); argument == "optional") {
+    keyword.argument = Keyword::Argument::Optional;
+  } else if (argument == "none") {
+    keyword.argument = Keyword::Argument::None;
+  } else if (!argument.isEmpty() && argument != "required") {
+    qWarning() << "Unknown keyword argument" << argument << "for keyword" << word;
+  }
+
+  if (auto mode = options.value("queueMode").toString(); mode == "wait") {
+    keyword.queueMode = Keyword::QueueMode::Wait;
+  } else if (!mode.isEmpty() && mode != "terminate") {
+    qWarning() << "Unknown keyword queue mode" << mode << "for keyword" << word;
+  }
+
+  // "immediate" or a number of milliseconds
+  if (auto delay = options.value("queueDelay"); delay.isDouble()) {
+    keyword.queueDelay = std::chrono::milliseconds(std::max(0, delay.toInt()));
+  }
+
+  keyword.withSpace = options.value("withSpace").toBool(true);
+  keyword.title = optionalString(u"title");
+  keyword.subtitle = optionalString(u"subtitle");
+  keyword.runningSubtitle = optionalString(u"runningSubtitle");
+
+  return keyword;
+}
+
 ExtensionManifest::Command ExtensionManifest::parseCommandFromObject(const QJsonObject &obj) {
   ExtensionManifest::Command command;
   auto type = obj.value("mode");
@@ -195,7 +231,9 @@ ExtensionManifest::Command ExtensionManifest::parseCommandFromObject(const QJson
   command.defaultDisabled = obj.value("disabledByDefault").toBool(false);
 
   if (obj.contains("icon")) { command.icon = obj.value("icon").toString(); }
-  if (auto keyword = obj.value("keyword").toString(); !keyword.isEmpty()) { command.keyword = keyword; }
+  if (auto keyword = obj.value("keyword").toString(); !keyword.isEmpty()) {
+    command.keyword = parseKeyword(keyword, obj.value("keywordOptions").toObject());
+  }
 
   if (type == "view") {
     command.mode = CommandMode::CommandModeView;

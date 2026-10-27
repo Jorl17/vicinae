@@ -416,6 +416,51 @@ export default z.object({
 							"Vicinae only: a word that shows the rows of the command in the root search. When the user types the keyword, a space and a query, Vicinae calls the default export of src/<name>.keyword.ts with the query and shows the rows it returns.",
 						)
 						.optional(),
+					keywordOptions: z
+						.object({
+							argument: z
+								.enum(["required", "optional", "none"])
+								.describe(
+									"'required' shows only the placeholder row until there is text after the keyword. 'optional' also runs the handler for the keyword alone. 'none' runs the handler for the keyword alone, and nothing may follow the keyword. Defaults to 'required'.",
+								)
+								.optional(),
+							withSpace: z
+								.boolean()
+								.describe(
+									"Whether a space must separate the query from the keyword. Defaults to true.",
+								)
+								.optional(),
+							title: z
+								.string()
+								.describe(
+									"Title of the row that Vicinae shows for the keyword before the handler returns rows. Defaults to the title of the command.",
+								)
+								.optional(),
+							subtitle: z.string().describe("Subtitle of that row.").optional(),
+							runningSubtitle: z
+								.string()
+								.describe(
+									"Subtitle of that row while the handler runs. Defaults to subtitle.",
+								)
+								.optional(),
+							queueDelay: z
+								.union([z.literal("immediate"), z.number().int().min(0)])
+								.describe(
+									"'immediate' runs the handler after every key press, and a number of milliseconds runs it that long after the last key press. Defaults to 'immediate'.",
+								)
+								.optional(),
+							queueMode: z
+								.enum(["terminate", "wait"])
+								.describe(
+									"'terminate' aborts the running query when the user types. 'wait' lets the running query finish and then runs only the newest text. Defaults to 'terminate'.",
+								)
+								.optional(),
+						})
+						.strict()
+						.describe(
+							"Vicinae only: how the keyword behaves, with the meaning of the same settings of an Alfred script filter.",
+						)
+						.optional(),
 				})
 				.catchall(z.any()),
 		)

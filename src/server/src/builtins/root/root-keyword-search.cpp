@@ -3,6 +3,7 @@
 #include <QFutureWatcher>
 #include <filesystem>
 #include "actions/clipboard-actions.hpp"
+#include "builtins/root/keyword-match.hpp"
 #include "builtins/root/root-search-sources.hpp"
 #include "extension/extension-command.hpp"
 #include "extension/extension-load-options.hpp"
@@ -68,6 +69,8 @@ private:
 RootKeywordSearch::RootKeywordSearch(const ServiceRegistry &services, QObject *parent)
     : QObject(parent), m_services(services), m_rootItems(services.rootItemManager()),
       m_extensions(services.extensionManager()) {
+  m_queueDelay.setSingleShot(true);
+  connect(&m_queueDelay, &QTimer::timeout, this, &RootKeywordSearch::sendPendingQuery);
   connect(m_rootItems, &RootItemManager::itemsChanged, this, &RootKeywordSearch::indexCommands);
   indexCommands();
 }
@@ -79,79 +82,167 @@ void RootKeywordSearch::indexCommands() {
     for (const auto &cmd : provider->repository()->commands()) {
       auto command = std::dynamic_pointer_cast<ExtensionCommand>(cmd);
       if (!command || !command->manifest().keyword) continue;
-      m_commands.emplace(command->manifest().keyword->toStdString(), std::move(command));
+      m_commands.emplace(command->manifest().keyword->word.toStdString(), std::move(command));
     }
   }
 }
 
-std::shared_ptr<ExtensionCommand> RootKeywordSearch::setQuery(std::string_view text) {
+// Find the command whose keyword starts the text. When several keywords match,
+// the longest one wins.
+std::optional<RootKeywordSearch::Match> RootKeywordSearch::match(std::string_view text) const {
+  std::optional<Match> best;
+  std::size_t bestLength = 0;
+
+  for (const auto &[word, command] : m_commands) {
+    if (word.size() <= bestLength) continue;
+    auto found = matchKeyword(text, *command->manifest().keyword);
+    if (!found || !m_rootItems->itemMetadata(command->uniqueId()).enabled) continue;
+
+    best = Match{.command = command, .query = std::move(found->query)};
+    bestLength = word.size();
+  }
+
+  return best;
+}
+
+const KeywordState &RootKeywordSearch::setText(std::string_view text) {
   ++m_generation;
 
-  auto space = text.find(' ');
-  if (space == std::string_view::npos) return nullptr;
+  auto found = match(text);
 
-  auto it = m_commands.find(std::string{text.substr(0, space)});
-  if (it == m_commands.end()) return nullptr;
+  if (!found) {
+    m_queueDelay.stop();
+    m_pendingQuery.reset();
+    m_wantsRows = false;
+    m_state = {};
+    return m_state;
+  }
 
-  auto command = it->second;
-  if (!m_rootItems->itemMetadata(command->uniqueId()).enabled) return nullptr;
+  if (found->command != m_state.command) {
+    m_state = {.command = found->command};
+    m_runningQuery = 0;
+  }
 
-  auto opts = keywordLoadOptions(*command, m_services);
+  const auto &keyword = *found->command->manifest().keyword;
+  auto title = keyword.title.value_or(found->command->name());
+  auto subtitle = keyword.subtitle.value_or(QString());
+
+  if (!found->query) {
+    m_queueDelay.stop();
+    m_pendingQuery.reset();
+    m_wantsRows = false;
+    m_state.items.clear();
+    m_state.placeholder = KeywordPlaceholder{.title = title, .subtitle = subtitle};
+    return m_state;
+  }
+
+  // While the user types after the same keyword, we keep the rows of the last
+  // query until the next rows arrive, as Alfred does.
+  m_wantsRows = true;
+  if (m_state.items.empty()) {
+    m_state.placeholder =
+        KeywordPlaceholder{.title = title, .subtitle = keyword.runningSubtitle.value_or(subtitle)};
+  }
+
+  m_pendingQuery = std::move(found->query);
+
+  if (keyword.queueDelay.count() > 0) {
+    m_queueDelay.start(keyword.queueDelay);
+  } else {
+    sendPendingQuery();
+  }
+
+  return m_state;
+}
+
+void RootKeywordSearch::sendPendingQuery() {
+  if (!m_pendingQuery || !m_state.command || m_queueDelay.isActive()) return;
+
+  using QueueMode = ExtensionManifest::Keyword::QueueMode;
+  auto command = m_state.command;
+
+  // In wait mode, handleReply sends the newest text when the running query finishes.
+  if (command->manifest().keyword->queueMode == QueueMode::Wait && m_runningQuery != 0) return;
+
+  auto query = *std::exchange(m_pendingQuery, std::nullopt);
+  auto id = ++m_lastQueryId;
+  m_runningQuery = id;
 
   using Watcher = QFutureWatcher<std::expected<manager::KeywordRows, std::string>>;
   auto *watcher = new Watcher(this);
 
-  connect(watcher, &Watcher::finished, this, [this, watcher, command, generation = m_generation]() {
+  connect(watcher, &Watcher::finished, this, [this, watcher, id, command, generation = m_generation]() {
     watcher->deleteLater();
-    if (generation != m_generation) return;
-
-    auto result = watcher->result();
-    if (!result) {
-      qWarning() << "Keyword query failed for" << command->name() << result.error();
-      return;
-    }
-
-    emit resultsReady({.command = command, .items = std::move(result->items)});
+    handleReply(id, generation, command, watcher->result());
   });
 
-  watcher->setFuture(
-      m_extensions->client().manager()->queryKeyword(opts, std::string{text.substr(space + 1)}));
+  auto opts = keywordLoadOptions(*command, m_services);
+  watcher->setFuture(m_extensions->client().manager()->queryKeyword(opts, query));
+}
 
-  return command;
+void RootKeywordSearch::handleReply(std::uint64_t id, std::uint64_t generation,
+                                    const std::shared_ptr<ExtensionCommand> &command,
+                                    std::expected<manager::KeywordRows, std::string> result) {
+  using QueueMode = ExtensionManifest::Keyword::QueueMode;
+
+  if (id == m_runningQuery) m_runningQuery = 0;
+
+  if (!result) {
+    qWarning() << "Keyword query failed for" << command->name() << result.error();
+  } else if (command == m_state.command && m_wantsRows) {
+    // In terminate mode a newer query replaces this one, and in wait mode we show
+    // these rows until the rows of the newest text arrive.
+    bool const current = generation == m_generation;
+    if (current || command->manifest().keyword->queueMode == QueueMode::Wait) {
+      m_state.items = std::move(result->items);
+      m_state.placeholder.reset();
+      emit stateChanged(m_state);
+    }
+  }
+
+  sendPendingQuery();
 }
 
 const manager::KeywordItem *RootKeywordSection::item(int i) const {
-  if (i < 0 || std::cmp_greater_equal(i, m_results.items.size())) return nullptr;
-  return &m_results.items[i];
+  if (i < 0 || std::cmp_greater_equal(i, m_state.items.size())) return nullptr;
+  return &m_state.items[i];
+}
+
+int RootKeywordSection::count() const {
+  return showsPlaceholder() ? 1 : static_cast<int>(m_state.items.size());
 }
 
 QString RootKeywordSection::sectionName() const {
-  return m_results.command ? m_results.command->name() : QString();
+  return m_state.command ? m_state.command->name() : QString();
 }
 
 QString RootKeywordSection::itemId(int i) const {
-  const auto *row = item(i);
-  if (!row) return {};
-  return QStringLiteral("keyword:%1:%2").arg(QString::fromStdString(m_results.command->uniqueId())).arg(i);
+  if (!m_state.command || i < 0 || i >= count()) return {};
+  auto id = QString::fromStdString(m_state.command->uniqueId());
+  if (showsPlaceholder()) return QStringLiteral("keyword:%1:placeholder").arg(id);
+  return QStringLiteral("keyword:%1:%2").arg(id).arg(i);
 }
 
 QString RootKeywordSection::itemTitle(int i) const {
+  if (showsPlaceholder()) return i == 0 ? m_state.placeholder->title : QString();
   const auto *row = item(i);
   return row ? QString::fromStdString(row->title) : QString();
 }
 
 QString RootKeywordSection::itemSubtitle(int i) const {
+  if (showsPlaceholder()) return i == 0 ? m_state.placeholder->subtitle : QString();
   const auto *row = item(i);
   return row && row->subtitle ? QString::fromStdString(*row->subtitle) : QString();
 }
 
 std::optional<ImageURL> RootKeywordSection::itemIcon(int i) const {
+  if (showsPlaceholder()) return m_state.command->iconUrl();
   const auto *row = item(i);
   if (!row) return {};
-  if (!row->icon) return m_results.command->iconUrl();
+  if (!row->icon) return m_state.command->iconUrl();
 
   std::error_code ec;
-  if (auto asset = m_results.command->assetPath() / *row->icon; std::filesystem::is_regular_file(asset, ec)) {
+  if (auto asset = m_state.command->assetPath() / *row->icon; std::filesystem::is_regular_file(asset, ec)) {
     return ImageURL::local(asset);
   }
 
@@ -192,7 +283,7 @@ std::unique_ptr<ActionPanelState> RootKeywordSection::actionPanel(int i) const {
       section->addAction(new PasteToFocusedWindowAction(content));
       break;
     case manager::KeywordActionType::Run:
-      section->addAction(new RunKeywordAction(m_results.command, action.content,
+      section->addAction(new RunKeywordAction(m_state.command, action.content,
                                               QString::fromStdString(action.title.value_or(""))));
       break;
     }

@@ -55,7 +55,7 @@ RootSearchModel::RootSearchModel(const ViewScope &scope, QObject *parent)
   });
 
   m_keywordSearch = new RootKeywordSearch(*scope.services(), this);
-  connect(m_keywordSearch, &RootKeywordSearch::resultsReady, this, &RootSearchModel::handleKeywordResults);
+  connect(m_keywordSearch, &RootKeywordSearch::stateChanged, this, &RootSearchModel::handleKeywordState);
 
   m_keywordSource = new RootKeywordSection;
   m_updateSource = new RootUpdateSection(m_updateService);
@@ -87,8 +87,7 @@ void RootSearchModel::setFilter(const QString &text) {
   setSelectFirstOnReset(true);
   scope().clearActions();
 
-  // Keep the rows of the last query while the user types after the same keyword.
-  if (m_keywordSearch->setQuery(m_query) != m_keywordSource->command()) m_keywordSource->setResults({});
+  m_keywordSource->setState(m_keywordSearch->setText(m_query));
 
   m_calcSource->setResult({});
   if (!fileSearchApplicable()) {
@@ -265,8 +264,8 @@ void RootSearchModel::handleFileSearchFinished() {
   rebuildKeepingSelection();
 }
 
-void RootSearchModel::handleKeywordResults(const KeywordResults &results) {
-  m_keywordSource->setResults(results);
+void RootSearchModel::handleKeywordState(const KeywordState &state) {
+  m_keywordSource->setState(state);
   rebuildKeepingSelection();
 }
 

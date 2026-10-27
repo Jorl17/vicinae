@@ -39,7 +39,7 @@ private:
   void handleFileSearchFinished();
   bool fileSearchApplicable() const;
   void refreshCalculator();
-  void handleKeywordResults(const KeywordResults &results);
+  void handleKeywordState(const KeywordState &state);
   void rebuildKeepingSelection();
 
   static constexpr int MIN_FS_TEXT_LENGTH = 3;
