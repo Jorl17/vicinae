@@ -1,4 +1,5 @@
 #pragma once
+#include "builtins/root/root-keyword-search.hpp"
 #include "builtins/root/root-search-sources.hpp"
 #include "ui/views/section-list-model.hpp"
 #include "services/calculator-service/abstract-calculator-backend.hpp"
@@ -38,6 +39,8 @@ private:
   void handleFileSearchFinished();
   bool fileSearchApplicable() const;
   void refreshCalculator();
+  void handleKeywordResults(const KeywordResults &results);
+  void rebuildKeepingSelection();
 
   static constexpr int MIN_FS_TEXT_LENGTH = 3;
 
@@ -49,6 +52,8 @@ private:
   FileService *m_fileService;
   config::Manager *m_config;
 
+  RootKeywordSearch *m_keywordSearch;
+  RootKeywordSection *m_keywordSource;
   RootUpdateSection *m_updateSource;
   RootLinkSection *m_linkSource;
   RootCalculatorSection *m_calcSource;

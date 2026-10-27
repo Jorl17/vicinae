@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
 import { isatty } from "node:tty";
 import { isMainThread, Worker } from "node:worker_threads";
-import * as fsp from "node:fs/promises";
 import { main as workerMain } from "./worker";
 
 import * as manager from "./proto/manager";
@@ -11,6 +10,8 @@ import * as path from "node:path";
 
 import type { EnvironmentType } from "./types";
 import { Logger } from "./logger";
+import { KeywordWorkers } from "./keyword-workers";
+import { createLaunchPayload } from "./launch-payload";
 import { setTimeout } from "node:timers";
 
 const WORKER_GRACE_PERIOD_MS = 5000;
@@ -64,49 +65,17 @@ class ExtensionManager extends manager.ManagerService {
 		const sessionId = randomUUID();
 		const worker = this.acquireWorker(load.env);
 		const client = this.createExtensionClient(worker);
-		const supportPath = path.join(
-			load.vicinae_path,
-			"support",
-			load.extension_id,
-		);
-		const supportInternal = path.join(supportPath, ".vicinae"); // for log stream, cli pid file...
-
-		const stdoutLog = path.join(supportInternal, "stdout.txt");
-		const stderrLog = path.join(supportInternal, "stderr.txt");
-		const assetsPath = path.join(
-			load.vicinae_path,
-			"extensions",
-			load.extension_id,
-			"assets",
-		);
-
-		await Promise.all([
-			fsp.mkdir(assetsPath, { recursive: true }),
-			fsp.mkdir(supportInternal, { recursive: true }),
-		]);
+		const { data: payload, supportInternalPath } =
+			await createLaunchPayload(load);
+		const stdoutLog = path.join(supportInternalPath, "stdout.txt");
+		const stderrLog = path.join(supportInternalPath, "stderr.txt");
 
 		const workerInfo: WorkerInfo = {
 			worker,
 			client,
 			status: "awaiting_handshake",
 			displayId: `${load.extension_id}:${load.command_name}`,
-			payload: {
-				entrypoint: load.entrypoint,
-				argumentValues: load.arguments,
-				preferenceValues: load.preferences,
-				launch_context: load.launch_context,
-				mode: load.mode,
-				support_path: supportPath,
-				asset_path: assetsPath,
-				is_raycast: load.is_raycast,
-				extension_name: load.extension_name,
-				owner_or_author_name: load.owner_or_author_name,
-				command_name: load.command_name,
-				launch_type: load.launch_type,
-				capabilities: load.capabilities,
-				cwd: load.cwd,
-				fallbackText: load.fallbackText,
-			},
+			payload,
 		};
 
 		this.workerMap.set(sessionId, workerInfo);
@@ -227,6 +196,13 @@ class ExtensionManager extends manager.ManagerService {
 		return true;
 	}
 
+	async queryKeyword(
+		opts: manager.LoadOptions,
+		query: string,
+	): Promise<manager.KeywordRows> {
+		return { items: await this.keywordWorkers.query(opts, query) };
+	}
+
 	async messageExtension(
 		session_id: string,
 		payload: string,
@@ -277,6 +253,10 @@ class ExtensionManager extends manager.ManagerService {
 
 	private readonly workerPool: Worker[] = [];
 	private readonly workerMap = new Map<string, WorkerInfo>();
+	private readonly keywordWorkers = new KeywordWorkers(
+		() => this.createWorker("production"),
+		logger,
+	);
 }
 
 class Vicinae {

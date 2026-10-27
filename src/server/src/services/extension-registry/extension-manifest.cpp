@@ -61,6 +61,7 @@ std::expected<ExtensionManifest, ManifestError> ExtensionManifest::fromPackageJs
 
     command.provenance = manifest.provenance;
     command.entrypoint = path / std::format("{}.js", command.name.toStdString());
+    command.keywordEntrypoint = path / std::format("{}.keyword.js", command.name.toStdString());
 
     if (supportedModes.contains(command.mode)) { manifest.commands.emplace_back(command); }
   }
@@ -194,6 +195,7 @@ ExtensionManifest::Command ExtensionManifest::parseCommandFromObject(const QJson
   command.defaultDisabled = obj.value("disabledByDefault").toBool(false);
 
   if (obj.contains("icon")) { command.icon = obj.value("icon").toString(); }
+  if (auto keyword = obj.value("keyword").toString(); !keyword.isEmpty()) { command.keyword = keyword; }
 
   if (type == "view") {
     command.mode = CommandMode::CommandModeView;

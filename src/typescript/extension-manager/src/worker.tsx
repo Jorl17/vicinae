@@ -10,6 +10,7 @@ import {
 } from "@vicinae/api";
 import { callbackManager } from "./callback";
 import { globalState } from "./globals";
+import { KeywordQueries } from "./loaders/keyword-handler";
 import loadNoView from "./loaders/load-no-view-command";
 import loadView from "./loaders/load-view-command";
 import { patchRequire } from "./patch-require";
@@ -19,12 +20,7 @@ import type { EnvironmentType } from "./types";
 
 class Lifecycle extends extensionServer.LifecycleService {
 	async launch(data: extensionServer.LaunchEventData): Promise<boolean> {
-		const { environment } = workerData as { environment: EnvironmentType };
-
-		// raycast compat captures preference values at load time: keep before patchRequire
-		loadEnviron(environment, data);
-		patchRequire(environment);
-		(process as any).noDeprecation = environment === "production";
+		prepareEnvironment(data);
 
 		if (data.mode === "View") {
 			await loadView(data);
@@ -49,7 +45,31 @@ class Lifecycle extends extensionServer.LifecycleService {
 		client.route(msg);
 		return true;
 	}
+
+	async query_keyword(
+		data: extensionServer.LaunchEventData,
+		query: string,
+	): Promise<extensionServer.KeywordRows> {
+		if (!keywordQueries) {
+			prepareEnvironment(data);
+			keywordQueries = new KeywordQueries();
+		}
+
+		globalState.preferences = data.preferenceValues;
+		return { items: await keywordQueries.run(data.entrypoint, query) };
+	}
 }
+
+let keywordQueries: KeywordQueries | undefined;
+
+const prepareEnvironment = (data: extensionServer.LaunchEventData) => {
+	const { environment } = workerData as { environment: EnvironmentType };
+
+	// raycast compat captures preference values at load time: keep before patchRequire
+	loadEnviron(environment, data);
+	patchRequire(environment);
+	(process as any).noDeprecation = environment === "production";
+};
 
 const serverRpc = new extensionServer.RpcTransport({
 	send: (msg) => {

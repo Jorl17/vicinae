@@ -26,6 +26,10 @@ struct ExtensionManifest {
     std::optional<QString> icon;
     std::optional<std::chrono::seconds> interval;
     std::filesystem::path entrypoint;
+    // The word that runs keywordEntrypoint while the user types in the root search,
+    // for example "calc" in "calc 2*3".
+    std::optional<QString> keyword;
+    std::filesystem::path keywordEntrypoint;
     bool defaultDisabled;
     Provenance provenance;
   };

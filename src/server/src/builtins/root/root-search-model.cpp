@@ -54,6 +54,10 @@ RootSearchModel::RootSearchModel(const ViewScope &scope, QObject *parent)
     if (rowCount() > 0) emit dataChanged(index(0), index(rowCount() - 1), {IconSource, AccessoryColor});
   });
 
+  m_keywordSearch = new RootKeywordSearch(*scope.services(), this);
+  connect(m_keywordSearch, &RootKeywordSearch::resultsReady, this, &RootSearchModel::handleKeywordResults);
+
+  m_keywordSource = new RootKeywordSection;
   m_updateSource = new RootUpdateSection(m_updateService);
   m_linkSource = new RootLinkSection;
   m_calcSource = new RootCalculatorSection;
@@ -63,6 +67,7 @@ RootSearchModel::RootSearchModel(const ViewScope &scope, QObject *parent)
   m_filesSource = new RootFilesSection(m_appDb);
   m_fallbackSource = new RootFallbackSection(m_manager);
 
+  addSource(m_keywordSource);
   addSource(m_updateSource);
   addSource(m_linkSource);
   addSource(m_calcSource);
@@ -81,6 +86,9 @@ void RootSearchModel::setFilter(const QString &text) {
   m_query = std::move(query);
   setSelectFirstOnReset(true);
   scope().clearActions();
+
+  // Keep the rows of the last query while the user types after the same keyword.
+  if (m_keywordSearch->setQuery(m_query) != m_keywordSource->command()) m_keywordSource->setResults({});
 
   m_calcSource->setResult({});
   if (!fileSearchApplicable()) {
@@ -254,6 +262,17 @@ void RootSearchModel::handleFileSearchFinished() {
   m_hasFileResults = true;
   m_fallbackSource->setItems(m_manager->fallbackItems());
 
+  rebuildKeepingSelection();
+}
+
+void RootSearchModel::handleKeywordResults(const KeywordResults &results) {
+  m_keywordSource->setResults(results);
+  rebuildKeepingSelection();
+}
+
+// Rebuild the list after results arrive. When the first row was selected, we
+// select the new first row, and otherwise we keep the selection.
+void RootSearchModel::rebuildKeepingSelection() {
   bool const atDefault = selectedIndex() < 0 || selectedIndex() == nextSelectableIndex(-1, 1);
 
   auto saved = selectFirstOnReset();

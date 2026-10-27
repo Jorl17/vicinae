@@ -1,4 +1,5 @@
 #include "extension-command-runtime.hpp"
+#include "extension/extension-load-options.hpp"
 #include "command/command-types.hpp"
 #include "common/context.hpp"
 #include "extension/views/extension-error-view-host.hpp"
@@ -68,54 +69,11 @@ void ExtensionCommandRuntime::initialize() {
   m_server->setParent(this);
 }
 
-// app pickers are stored as app ids, but extensions expect the `Application` shape of the applications API
-PreferenceValues ExtensionCommandRuntime::resolvePreferenceValues(PreferenceValues values) const {
-  auto *appDb = context()->services->appDb();
-  auto *rootItemManager = context()->services->rootItemManager();
-
-  const auto resolve = [&](const glz::generic &v) -> glz::generic {
-    if (!v.is_string()) return {};
-    auto app = appDb->findById(QString::fromStdString(v.get_string()));
-    if (!app) return {};
-    return glz::generic::object_t{
-        {"id", app->id().toStdString()},
-        {"name", app->displayName().toStdString()},
-        {"icon", app->iconUrl().toString().toStdString()},
-        {"path", app->path().string()},
-    };
-  };
-
-  for (const auto &pref : rootItemManager->getMergedItemPreferences(m_command->uniqueId())) {
-    auto data = pref.data();
-    auto *picker = std::get_if<Preference::AppPickerData>(&data);
-    if (!picker) continue;
-    auto it = values.find(pref.name().toStdString());
-    if (it == values.end()) continue;
-
-    if (picker->multiple) {
-      glz::generic::array_t apps;
-      if (it->second.is_array()) {
-        for (const auto &id : it->second.get_array()) {
-          if (auto app = resolve(id); !app.is_null()) apps.emplace_back(std::move(app));
-        }
-      }
-      it->second = std::move(apps);
-    } else {
-      it->second = resolve(it->second);
-    }
-  }
-
-  return values;
-}
-
 void ExtensionCommandRuntime::load(const LaunchProps &props) {
   initialize();
 
-  auto rootItemManager = context()->services->rootItemManager();
-  auto preferenceValues =
-      resolvePreferenceValues(rootItemManager->getPreferenceValues(m_command->uniqueId()));
   auto manager = context()->services->extensionManager();
-  manager::LoadOptions opts;
+  auto opts = extensionLoadOptions(*m_command, *context()->services);
 
   if (m_command->mode() == CommandModeView) {
     // We push the first view immediately, waiting for the initial render to come
@@ -128,34 +86,16 @@ void ExtensionCommandRuntime::load(const LaunchProps &props) {
       context()->navigation->setNavigationSuffixIcon(
           ImageURL::builtin(BuiltinIcon::Hammer).setFill(SemanticColor::Green));
     opts.env = manager::CommandEnv::Development;
-  } else {
-    opts.env = manager::CommandEnv::Production;
   }
-
-  opts.entrypoint = m_command->manifest().entrypoint.string();
-  opts.mode = m_command->mode() == CommandMode::CommandModeView ? manager::CommandMode::View
-                                                                : manager::CommandMode::NoView;
 
   opts.cwd = props.cwd.transform([](const QString &s) { return s.toStdString(); });
   opts.fallbackText = props.fallbackText.transform([](const QString &s) { return s.toStdString(); });
-  opts.extension_id = m_command->extensionId().toStdString();
-  opts.vicinae_path = Omnicast::dataDir().string();
-  opts.command_name = m_command->commandId().toStdString();
-  opts.extension_name = m_command->repositoryName().toStdString();
-  opts.owner_or_author_name = m_command->author().toStdString();
-  opts.is_raycast = m_command->isRaycast();
-  opts.preferences = std::move(preferenceValues);
   opts.launch_context = props.launchContext;
   opts.arguments = props.arguments |
                    std::views::transform([](auto &&pair) -> std::pair<std::string, std::string> {
                      return {pair.first.toStdString(), pair.second.toStdString()};
                    }) |
                    std::ranges::to<std::unordered_map<std::string, std::string>>();
-
-  opts.capabilities.browserExtension = !context()->services->browserExtension()->browsers().empty();
-  opts.capabilities.windowManagement = context()->services->windowManager()->isCapable();
-  opts.capabilities.wallpaper = context()->services->wallpaperManager()->canSetWallpaper();
-  opts.capabilities.fileSearch = context()->services->fileService()->isAvailable();
 
   // FIXME: relying on the presence of props.cwd to infer CommandLine mode is not
   // very accurate and could break in the future, we probably want to pass the activation
@@ -164,8 +104,6 @@ void ExtensionCommandRuntime::load(const LaunchProps &props) {
     opts.launch_type = manager::LaunchType::CommandLine;
   } else if (m_headless) {
     opts.launch_type = manager::LaunchType::Background;
-  } else {
-    opts.launch_type = manager::LaunchType::User;
   }
 
   auto watcher = new QFutureWatcher<std::expected<manager::LoadResponse, std::string>>(this);

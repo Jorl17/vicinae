@@ -31,7 +31,6 @@ class ExtensionLogger : public tsapi::AbstractLogger {
 
 class ExtensionCommandRuntime : public CommandContext {
   void initialize();
-  PreferenceValues resolvePreferenceValues(PreferenceValues values) const;
 
 public:
   void load(const LaunchProps &props) override;

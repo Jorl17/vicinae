@@ -429,6 +429,8 @@ set(SRCS
 	src/log/message-handler.cpp
 
 	src/extension/extension-command-runtime.cpp
+	src/extension/extension-load-options.hpp
+	src/extension/extension-load-options.cpp
 	src/extension/api/ui-service.hpp
 	src/extension/api/wallpaper-service.hpp
 
@@ -541,6 +543,8 @@ set(SRCS
 	src/builtins/root/root-view-host.cpp
 	src/builtins/root/root-search-model.hpp
 	src/builtins/root/root-search-model.cpp
+	src/builtins/root/root-keyword-search.hpp
+	src/builtins/root/root-keyword-search.cpp
 	src/builtins/root/root-search-sources.hpp
 	src/builtins/root/root-search-sources.cpp
 	src/ui/views/drag-utils.hpp

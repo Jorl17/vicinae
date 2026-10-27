@@ -46,6 +46,33 @@ struct LoadOptions {
   cwd?: string;
 };
 
+// A row that a command returns for a keyword query in the root search, for
+// example "calc 2*3". The first action is the primary action.
+enum KeywordActionType {
+  Copy,
+  Paste
+};
+
+struct KeywordAction {
+  type: KeywordActionType;
+  content: string;
+  title?: string;
+};
+
+struct KeywordItem {
+  title: string;
+  subtitle?: string;
+  icon?: string;
+  accessory?: string;
+  actions: KeywordAction[];
+};
+
+// We wrap the rows in a struct, because figura does not generate list return types
+// for TypeScript.
+struct KeywordRows {
+  items: KeywordItem[];
+};
+
 struct LoadResponse {
   session_id: string;
 };
@@ -61,6 +88,11 @@ service Manager {
   fn ready(session_id: string) => bool;
 
   fn messageExtension(session_id: string, payload: string) => bool;
+
+  // Run the keyword handler of a command (opts.entrypoint) with the text typed
+  // after the keyword. A newer query for the same command cancels the older one,
+  // which then returns no rows.
+  fn queryKeyword(opts: LoadOptions, query: string) => KeywordRows;
 
   event extensionMessage(session_id: string, payload: string);
   event extensionCrash(session_id: string, reason: string);

@@ -42,10 +42,38 @@ struct LaunchEventData {
   cwd?: string;
 };
 
+// A row that a command returns for a keyword query in the root search, for
+// example "calc 2*3". The first action is the primary action.
+enum KeywordActionType {
+  Copy,
+  Paste
+};
+
+struct KeywordAction {
+  type: KeywordActionType;
+  content: string;
+  title?: string;
+};
+
+struct KeywordItem {
+  title: string;
+  subtitle?: string;
+  icon?: string;
+  accessory?: string;
+  actions: KeywordAction[];
+};
+
+// We wrap the rows in a struct, because figura does not generate list return types
+// for TypeScript.
+struct KeywordRows {
+  items: KeywordItem[];
+};
+
 service Lifecycle {
   fn launch(data: LaunchEventData) => bool;
   fn shutdown() => bool;
   fn send_message(msg: string) => bool;
+  fn query_keyword(data: LaunchEventData, query: string) => KeywordRows;
   event extension_message(msg: string);
   
   // worker can explicitly request to be unloaded. only applies to `no-view` commands which have a predictable termination point.
