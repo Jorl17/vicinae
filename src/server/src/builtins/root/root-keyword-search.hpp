@@ -23,6 +23,8 @@ class ServiceRegistry;
 struct KeywordPlaceholder {
   QString title;
   QString subtitle;
+  // The search text that Enter sets, or nullopt when Enter does nothing.
+  std::optional<QString> completion;
 };
 
 /* What the root search shows for the keyword of an extension command: the rows

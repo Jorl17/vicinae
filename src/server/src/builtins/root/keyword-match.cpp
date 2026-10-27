@@ -30,3 +30,11 @@ std::optional<KeywordMatch> matchKeyword(std::string_view text, const ExtensionM
 
   return KeywordMatch{.query = std::move(query)};
 }
+
+std::optional<std::string> keywordCompletion(std::string_view text,
+                                             const ExtensionManifest::Keyword &keyword) {
+  auto completion = keyword.word.toStdString();
+  if (keyword.withSpace) completion += ' ';
+  if (text.starts_with(completion)) return std::nullopt;
+  return completion;
+}

@@ -64,6 +64,21 @@ private:
   std::string m_id;
 };
 
+// Put the keyword in the search text, as Enter on a script filter keyword does in
+// Alfred. The window stays open, and the new text runs the query.
+class CompleteKeywordAction : public AbstractAction {
+public:
+  explicit CompleteKeywordAction(QString text)
+      : AbstractAction(QCoreApplication::translate("CompleteKeywordAction", "Complete Keyword"),
+                       ImageURL::builtin(BuiltinIcon::Text)),
+        m_text(std::move(text)) {}
+
+  void execute(ApplicationContext *ctx) override { ctx->navigation->setSearchText(m_text); }
+
+private:
+  QString m_text;
+};
+
 } // namespace
 
 RootKeywordSearch::RootKeywordSearch(const ServiceRegistry &services, QObject *parent)
@@ -126,13 +141,16 @@ const KeywordState &RootKeywordSearch::setText(std::string_view text) {
   const auto &keyword = *found->command->manifest().keyword;
   auto title = keyword.title.value_or(found->command->name());
   auto subtitle = keyword.subtitle.value_or(QString());
+  auto completion = keywordCompletion(text, keyword).transform([](const std::string &s) {
+    return QString::fromStdString(s);
+  });
 
   if (!found->query) {
     m_queueDelay.stop();
     m_pendingQuery.reset();
     m_wantsRows = false;
     m_state.items.clear();
-    m_state.placeholder = KeywordPlaceholder{.title = title, .subtitle = subtitle};
+    m_state.placeholder = KeywordPlaceholder{.title = title, .subtitle = subtitle, .completion = completion};
     return m_state;
   }
 
@@ -140,8 +158,8 @@ const KeywordState &RootKeywordSearch::setText(std::string_view text) {
   // query until the next rows arrive, as Alfred does.
   m_wantsRows = true;
   if (m_state.items.empty()) {
-    m_state.placeholder =
-        KeywordPlaceholder{.title = title, .subtitle = keyword.runningSubtitle.value_or(subtitle)};
+    m_state.placeholder = KeywordPlaceholder{
+        .title = title, .subtitle = keyword.runningSubtitle.value_or(subtitle), .completion = completion};
   }
 
   m_pendingQuery = std::move(found->query);
@@ -262,6 +280,13 @@ QHash<int, QVariant> RootKeywordSection::customRoleDefaults() const {
 }
 
 std::unique_ptr<ActionPanelState> RootKeywordSection::actionPanel(int i) const {
+  if (showsPlaceholder()) {
+    if (!m_state.placeholder->completion) return nullptr;
+    auto panel = std::make_unique<ListActionPanelState>();
+    panel->createSection()->addAction(new CompleteKeywordAction(*m_state.placeholder->completion));
+    return panel;
+  }
+
   const auto *row = item(i);
   if (!row || row->actions.empty()) return nullptr;
 

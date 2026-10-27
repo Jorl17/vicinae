@@ -39,4 +39,13 @@ TEST_CASE("without the space, the text right after the keyword is the query") {
   REQUIRE(matchKeyword("pw24", pw)->query == "24");
   REQUIRE(matchKeyword("pw 24", pw)->query == "24");
 }
+TEST_CASE("enter on the placeholder row completes the keyword and keeps a typed query") {
+  Keyword const calc{.word = "calc"};
+  Keyword const ip{.word = "ip", .argument = Keyword::Argument::None, .withSpace = false};
+
+  REQUIRE(keywordCompletion("calc", calc) == "calc ");
+  REQUIRE(keywordCompletion("calc ", calc) == std::nullopt);
+  REQUIRE(keywordCompletion("calc 2*3", calc) == std::nullopt);
+  REQUIRE(keywordCompletion("ip", ip) == std::nullopt);
+}
 // NOLINTEND(bugprone-throwing-static-initialization)
