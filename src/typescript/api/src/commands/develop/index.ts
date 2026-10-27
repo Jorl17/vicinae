@@ -6,6 +6,7 @@ import * as path from "node:path";
 import type { CommandDef } from "../../cli.js";
 import ManifestSchema from "../../schemas/manifest.js";
 import { updateExtensionTypes } from "../../utils/extension-types.js";
+import { keywordEntryPoints } from "../../utils/keyword.js";
 import { Logger } from "../../utils/logger.js";
 import { Tail } from "../../utils/tail.js";
 import { typeCheck } from "../../utils/typecheck.js";
@@ -87,7 +88,7 @@ const develop: CommandDef = {
 
 				return esbuild.build({
 					bundle: true,
-					entryPoints: [source],
+					entryPoints: [source, ...keywordEntryPoints(cmd, process.cwd())],
 					external: [
 						"react",
 						"react/jsx-runtime",

@@ -474,6 +474,12 @@
             "type": "boolean",
             "title": "Whether the command should be enabled by default or not",
             "description": "Defaults to `false`"
+          },
+          "keyword": {
+            "type": "string",
+            "pattern": "^[^\\s]+$",
+            "title": "Root search keyword (Vicinae only)",
+            "description": "When the user types the keyword, a space and a query in the root search, Vicinae calls the default export of src/<name>.keyword.ts with the query and shows the rows it returns."
           }
         },
         "additionalProperties": true

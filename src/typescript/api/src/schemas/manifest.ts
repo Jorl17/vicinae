@@ -409,6 +409,13 @@ export default z.object({
 						.boolean()
 						.describe("Defaults to `false`")
 						.optional(),
+					keyword: z
+						.string()
+						.regex(new RegExp("^[^\\s]+$"))
+						.describe(
+							"Vicinae only: a word that shows the rows of the command in the root search. When the user types the keyword, a space and a query, Vicinae calls the default export of src/<name>.keyword.ts with the query and shows the rows it returns.",
+						)
+						.optional(),
 				})
 				.catchall(z.any()),
 		)
