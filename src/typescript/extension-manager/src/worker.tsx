@@ -58,6 +58,13 @@ class Lifecycle extends extensionServer.LifecycleService {
 		globalState.preferences = data.preferenceValues;
 		return { items: await keywordQueries.run(data.entrypoint, query) };
 	}
+
+	async run_keyword_action(
+		action_id: string,
+	): Promise<extensionServer.KeywordActionResult> {
+		if (!keywordQueries) return { error: "These results are out of date" };
+		return keywordQueries.runAction(action_id);
+	}
 }
 
 let keywordQueries: KeywordQueries | undefined;

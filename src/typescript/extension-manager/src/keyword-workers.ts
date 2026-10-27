@@ -6,7 +6,28 @@ import type * as manager from "./proto/manager";
 import * as extension from "./proto/manager-extension";
 
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
-const QUERY_TIMEOUT_MS = 5000;
+// A handler can make a network request, for example to find the external IP address.
+const QUERY_TIMEOUT_MS = 10_000;
+
+// Return undefined, after calling onTimeout, when the promise takes too long.
+const withTimeout = async <T>(
+	promise: Promise<T>,
+	onTimeout: () => void,
+): Promise<T | undefined> => {
+	let timeout: NodeJS.Timeout | undefined;
+	const expired = new Promise<undefined>((resolve) => {
+		timeout = setTimeout(() => {
+			onTimeout();
+			resolve(undefined);
+		}, QUERY_TIMEOUT_MS);
+	});
+
+	try {
+		return await Promise.race([promise, expired]);
+	} finally {
+		clearTimeout(timeout);
+	}
+};
 
 type KeywordWorker = {
 	worker: Worker;
@@ -50,24 +71,26 @@ export class KeywordWorkers {
 		clearTimeout(entry.idleTimer);
 		entry.idleTimer = setTimeout(() => this.stop(key), IDLE_TIMEOUT_MS);
 
-		let timeout: NodeJS.Timeout | undefined;
-		const expired = new Promise<manager.KeywordItem[]>((resolve) => {
-			timeout = setTimeout(() => {
-				this.logger.error(`keyword query for ${key} timed out`);
-				resolve([]);
-			}, QUERY_TIMEOUT_MS);
-		});
+		const rows = await withTimeout(
+			entry.client.Lifecycle.query_keyword(data, query),
+			() => this.logger.error(`keyword query for ${key} timed out`),
+		);
+		return rows?.items ?? [];
+	}
 
-		try {
-			return await Promise.race([
-				entry.client.Lifecycle.query_keyword(data, query).then(
-					(rows) => rows.items,
-				),
-				expired,
-			]);
-		} finally {
-			clearTimeout(timeout);
-		}
+	/** Run an action from the rows of the last query of a command. */
+	async runAction(
+		load: manager.LoadOptions,
+		id: string,
+	): Promise<manager.KeywordActionResult> {
+		const entry = this.workers.get(`${load.extension_id}:${load.command_name}`);
+		if (!entry) return { error: "These results are out of date" };
+
+		const result = await withTimeout(
+			entry.client.Lifecycle.run_keyword_action(id),
+			() => {},
+		);
+		return result ?? { error: "The action did not finish in time" };
 	}
 
 	private start(key: string, builtAt: number): KeywordWorker {

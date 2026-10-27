@@ -203,6 +203,13 @@ class ExtensionManager extends manager.ManagerService {
 		return { items: await this.keywordWorkers.query(opts, query) };
 	}
 
+	async runKeywordAction(
+		opts: manager.LoadOptions,
+		action_id: string,
+	): Promise<manager.KeywordActionResult> {
+		return this.keywordWorkers.runAction(opts, action_id);
+	}
+
 	async messageExtension(
 		session_id: string,
 		payload: string,

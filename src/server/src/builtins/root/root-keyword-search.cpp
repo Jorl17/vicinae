@@ -9,8 +9,61 @@
 #include "extension/manager/extension-manager.hpp"
 #include "root-search/extensions/extension-root-provider.hpp"
 #include "service-registry.hpp"
+#include "navigation-controller.hpp"
+#include "common/context.hpp"
 #include "services/root-item-manager/root-item-manager.hpp"
 #include "ui/action-panel/action-panel-state.hpp"
+
+namespace {
+
+manager::LoadOptions keywordLoadOptions(const ExtensionCommand &command, const ServiceRegistry &services) {
+  auto opts = extensionLoadOptions(command, services);
+  opts.entrypoint = command.manifest().keywordEntrypoint.string();
+  opts.mode = manager::CommandMode::NoView;
+  return opts;
+}
+
+// Run an action of type Run from a keyword row in the extension, and show the
+// text or the error that it returns in a HUD.
+class RunKeywordAction : public AbstractAction {
+public:
+  RunKeywordAction(std::shared_ptr<ExtensionCommand> command, std::string id, const QString &title)
+      : AbstractAction(title, ImageURL::builtin(BuiltinIcon::Play)), m_command(std::move(command)),
+        m_id(std::move(id)) {}
+
+  void execute(ApplicationContext *ctx) override {
+    using Watcher = QFutureWatcher<std::expected<manager::KeywordActionResult, std::string>>;
+    auto *registry = ServiceRegistry::instance();
+    auto *watcher = new Watcher(registry);
+    auto *navigation = ctx->navigation.get();
+
+    QObject::connect(watcher, &Watcher::finished, registry, [watcher, navigation]() {
+      watcher->deleteLater();
+      auto result = watcher->result();
+
+      if (!result) {
+        navigation->showHud(QString::fromStdString(result.error()),
+                            ImageURL::builtin(BuiltinIcon::XMarkCircle));
+      } else if (result->error) {
+        navigation->showHud(QString::fromStdString(*result->error),
+                            ImageURL::builtin(BuiltinIcon::XMarkCircle));
+      } else if (result->hud) {
+        navigation->showHud(QString::fromStdString(*result->hud));
+      } else {
+        navigation->closeWindow();
+      }
+    });
+
+    auto opts = keywordLoadOptions(*m_command, *registry);
+    watcher->setFuture(registry->extensionManager()->client().manager()->runKeywordAction(opts, m_id));
+  }
+
+private:
+  std::shared_ptr<ExtensionCommand> m_command;
+  std::string m_id;
+};
+
+} // namespace
 
 RootKeywordSearch::RootKeywordSearch(const ServiceRegistry &services, QObject *parent)
     : QObject(parent), m_services(services), m_rootItems(services.rootItemManager()),
@@ -43,9 +96,7 @@ std::shared_ptr<ExtensionCommand> RootKeywordSearch::setQuery(std::string_view t
   auto command = it->second;
   if (!m_rootItems->itemMetadata(command->uniqueId()).enabled) return nullptr;
 
-  auto opts = extensionLoadOptions(*command, m_services);
-  opts.entrypoint = command->manifest().keywordEntrypoint.string();
-  opts.mode = manager::CommandMode::NoView;
+  auto opts = keywordLoadOptions(*command, m_services);
 
   using Watcher = QFutureWatcher<std::expected<manager::KeywordRows, std::string>>;
   auto *watcher = new Watcher(this);
@@ -139,6 +190,10 @@ std::unique_ptr<ActionPanelState> RootKeywordSection::actionPanel(int i) const {
       break;
     case manager::KeywordActionType::Paste:
       section->addAction(new PasteToFocusedWindowAction(content));
+      break;
+    case manager::KeywordActionType::Run:
+      section->addAction(new RunKeywordAction(m_results.command, action.content,
+                                              QString::fromStdString(action.title.value_or(""))));
       break;
     }
   }

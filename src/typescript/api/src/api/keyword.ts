@@ -9,13 +9,23 @@
  * This is a Vicinae extension of the Raycast API.
  */
 
-export type KeywordAction = {
-	/** `copy` copies `content` to the clipboard, `paste` pastes it into the focused window. */
-	type: "copy" | "paste";
-	content: string;
-	/** The title in the action panel. Vicinae chooses one when it is missing. */
-	title?: string;
-};
+export type KeywordAction =
+	| {
+			/** `copy` copies `content` to the clipboard, `paste` pastes it into the focused window. */
+			type: "copy" | "paste";
+			content: string;
+			/** The title in the action panel. Vicinae chooses one when it is missing. */
+			title?: string;
+	  }
+	| {
+			/**
+			 * `run` calls `run` in the extension. When it returns a text, Vicinae shows
+			 * the text in a HUD. When it throws, Vicinae shows the error message.
+			 */
+			type: "run";
+			title: string;
+			run: () => void | string | Promise<void | string>;
+	  };
 
 export type KeywordItem = {
 	title: string;

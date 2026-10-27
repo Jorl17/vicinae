@@ -46,11 +46,13 @@ struct LaunchEventData {
 // example "calc 2*3". The first action is the primary action.
 enum KeywordActionType {
   Copy,
-  Paste
+  Paste,
+  Run
 };
 
 struct KeywordAction {
   type: KeywordActionType;
+  // The text to copy or paste, or the id of a Run action for runKeywordAction.
   content: string;
   title?: string;
 };
@@ -69,11 +71,18 @@ struct KeywordRows {
   items: KeywordItem[];
 };
 
+// The text of the HUD that we show after a Run action, or the error message.
+struct KeywordActionResult {
+  hud?: string;
+  error?: string;
+};
+
 service Lifecycle {
   fn launch(data: LaunchEventData) => bool;
   fn shutdown() => bool;
   fn send_message(msg: string) => bool;
   fn query_keyword(data: LaunchEventData, query: string) => KeywordRows;
+  fn run_keyword_action(action_id: string) => KeywordActionResult;
   event extension_message(msg: string);
   
   // worker can explicitly request to be unloaded. only applies to `no-view` commands which have a predictable termination point.
