@@ -49,7 +49,10 @@ LauncherWindowBase {
     readonly property bool _fitted: Config.fitToContent && !Launcher.compacted && !Launcher.hasOverlay && !Launcher.actionPanel.open && !Launcher.footerPanel.open && root._viewFittedHeight >= 0
     readonly property int _fittedH: {
         const page = commandStack.currentItem as LauncherPage;
-        const needed = root.appearance.contentInset + contentViewport.y + (page?.topInset ?? 0) + root._viewFittedHeight + contentClip.anchors.bottomMargin + root.appearance.contentInset;
+        // With a floating status bar, the list reaches under the bar and its bottom
+        // margin already covers it. Otherwise the list ends above the bar.
+        const belowList = contentViewport.height - contentArea.height;
+        const needed = root.appearance.contentInset + contentViewport.y + (page?.topInset ?? 0) + root._viewFittedHeight + belowList + root.appearance.contentInset;
         return Math.min(root._h, Math.max(root._compactH, Math.ceil(needed)));
     }
     readonly property int _contentH: Launcher.compacted ? root._compactH : root._fitted ? root._fittedH : root._h
@@ -171,7 +174,6 @@ LauncherWindowBase {
                 Layout.fillHeight: true
 
                 Item {
-                    id: contentClip
                     anchors.fill: parent
                     anchors.bottomMargin: (root.contentEffect === null || !root.appearance.floatingStatusBar) && floatingStatusBar.visible ? floatingStatusBar.height - root.appearance.contentInset : 0
                     clip: true
