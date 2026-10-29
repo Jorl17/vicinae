@@ -58,10 +58,16 @@ SelectableDelegate {
         Item {
             id: textRow
             Layout.fillWidth: true
+            Layout.fillHeight: true
             Layout.minimumWidth: 100
-            implicitHeight: twoLines ? titleText.implicitHeight + subtitleText.anchors.topMargin + subtitleText.implicitHeight : titleText.implicitHeight
+            implicitHeight: textHeight
 
+            // The text is placed by position, centred in the row: the title alone, or
+            // the title and the subtitle under it as one block.
             readonly property bool twoLines: root.subtitleBelow && subtitleText.visible
+            readonly property real lineGap: 1
+            readonly property real textHeight: twoLines ? titleText.implicitHeight + lineGap + subtitleText.implicitHeight : titleText.implicitHeight
+            readonly property real textTop: Math.round((height - textHeight) / 2)
             readonly property real spacing: root.appearance.rowTextSpacing
             readonly property real shortcutLeadingSpace: 8
             readonly property real aliasSpace: (aliasBadge.visible ? aliasBadge.width + spacing : 0) + (shortcutBadge.visible ? shortcutBadge.width + spacing + shortcutLeadingSpace : 0)
@@ -71,8 +77,7 @@ SelectableDelegate {
             Text {
                 id: titleText
                 anchors.left: parent.left
-                anchors.verticalCenter: textRow.twoLines ? undefined : parent.verticalCenter
-                anchors.top: textRow.twoLines ? parent.top : undefined
+                y: textRow.textTop
                 width: Math.min(implicitWidth, textRow.availableForText - textRow.subtitleReserved)
                 text: root.itemTitle
                 color: root.selected ? root.appearance.selectedText : root.hovered ? root.appearance.hoveredText : Theme.foreground
@@ -87,8 +92,7 @@ SelectableDelegate {
                 anchors.left: root.subtitleBelow ? parent.left : titleText.right
                 anchors.leftMargin: visible && !root.subtitleBelow ? textRow.spacing : 0
                 anchors.baseline: root.subtitleBelow ? undefined : titleText.baseline
-                anchors.top: root.subtitleBelow ? titleText.bottom : undefined
-                anchors.topMargin: root.subtitleBelow ? 1 : 0
+                y: root.subtitleBelow ? titleText.y + titleText.implicitHeight + textRow.lineGap : 0
                 width: root.subtitleBelow ? Math.min(implicitWidth, textRow.availableForText) : Math.min(implicitWidth, Math.max(0, textRow.availableForText - titleText.width - textRow.spacing))
                 text: root.itemSubtitle
                 color: root.selected ? root.appearance.selectedSecondaryText : root.hovered ? root.appearance.hoveredSecondaryText : Theme.textMuted
