@@ -24,7 +24,10 @@ export class RpcTransport {
 	dispatchMessage(data: string) {
 		const msg = JSON.parse(data) as JsonRpcMessage;
 
-		if (msg.id !== undefined) {
+		// Only a reply answers a request. A request of the other side carries a
+		// method, and its id can equal the id of one of our requests when two
+		// conversations share the channel, as with an extension worker.
+		if (msg.id !== undefined && msg.method === undefined) {
 			const handler = this.requestMap.get(msg.id);
 
 			if (handler) {
