@@ -30,6 +30,7 @@ const QHash<int, QByteArray> &customRoleNames() {
       {CalcAnswer, "calcAnswer"},
       {CalcAnswerUnit, "calcAnswerUnit"},
       {IsFile, "isFile"},
+      {SubtitleBelow, "subtitleBelow"},
   };
   return roles;
 }
@@ -46,6 +47,7 @@ const QHash<int, QVariant> &customRoleDefaults() {
       {CalcAnswer, QString()},
       {CalcAnswerUnit, QString()},
       {IsFile, false},
+      {SubtitleBelow, false},
   };
   return defaults;
 }

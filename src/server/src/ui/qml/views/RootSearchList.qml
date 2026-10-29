@@ -35,6 +35,7 @@ GenericListView {
         required property string calcAnswerUnit
         required property bool isFile
         required property bool isDraggable
+        required property bool subtitleBelow
 
         sourceComponent: {
             if (isSection)
@@ -79,6 +80,7 @@ GenericListView {
                 itemIsActive: delegateLoader.isActive
                 itemAccessory: delegateLoader.accessoryText
                 itemAccessoryColor: delegateLoader.accessoryColor
+                subtitleBelow: delegateLoader.subtitleBelow
                 quickAccessIndex: delegateLoader.quickAccessIndex
                 selected: searchListView.currentIndex === delegateLoader.index
                 draggable: delegateLoader.isDraggable

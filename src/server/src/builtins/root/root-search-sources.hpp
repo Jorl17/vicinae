@@ -26,6 +26,9 @@ enum RootSearchRole {
   CalcAnswer,
   CalcAnswerUnit,
   IsFile,
+  // Whether the row shows its subtitle under its title (keyword rows, see
+  // the keyword_results settings).
+  SubtitleBelow,
 };
 
 struct OwnedResult {

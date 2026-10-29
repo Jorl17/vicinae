@@ -54,6 +54,11 @@ public:
 
   const KeywordState &setText(std::string_view text);
 
+  /* Whether the text goes past a keyword: the keyword and more, such as "m " or
+   * "calc 2*3". The keyword alone ("m") is still searched like any other text.
+   * See the keyword_results settings. */
+  bool engaged() const { return m_engaged; }
+
 private:
   struct Match {
     std::shared_ptr<ExtensionCommand> command;
@@ -82,6 +87,7 @@ private:
   KeywordPlaceholder m_keywordRow;
   // Whether the current text asks for rows, which it does not while a required argument is missing.
   bool m_wantsRows = false;
+  bool m_engaged = false;
   std::optional<std::string> m_pendingQuery;
   QTimer m_queueDelay;
   // The id of the query that the handler runs, or 0.
@@ -108,9 +114,19 @@ public:
 
   void setState(KeywordState state) { m_state = std::move(state); }
 
+  /* The look of the rows, from the keyword_results settings: whether the
+   * command's name is shown above them, and whether a row's subtitle goes
+   * under its title. */
+  void setLook(bool sectionTitle, bool subtitleBelowTitle) {
+    m_sectionTitle = sectionTitle;
+    m_subtitleBelowTitle = subtitleBelowTitle;
+  }
+
 private:
   const manager::KeywordItem *item(int i) const;
   bool showsPlaceholder() const { return m_state.items.empty() && m_state.placeholder.has_value(); }
 
   KeywordState m_state;
+  bool m_sectionTitle = true;
+  bool m_subtitleBelowTitle = false;
 };

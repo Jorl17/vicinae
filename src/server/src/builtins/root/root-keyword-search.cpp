@@ -125,6 +125,7 @@ const KeywordState &RootKeywordSearch::setText(std::string_view text) {
   ++m_generation;
 
   auto found = match(text);
+  m_engaged = found && text.size() > found->command->manifest().keyword->word.toUtf8().size();
 
   if (!found) {
     m_queueDelay.stop();
@@ -263,8 +264,9 @@ int RootKeywordSection::count() const {
   return showsPlaceholder() ? 1 : static_cast<int>(m_state.items.size());
 }
 
+// Without a name, the list shows no header above the rows.
 QString RootKeywordSection::sectionName() const {
-  return m_state.command ? m_state.command->name() : QString();
+  return m_state.command && m_sectionTitle ? m_state.command->name() : QString();
 }
 
 QString RootKeywordSection::itemId(int i) const {
@@ -301,6 +303,7 @@ std::optional<ImageURL> RootKeywordSection::itemIcon(int i) const {
 }
 
 QVariant RootKeywordSection::customData(int i, int role) const {
+  if (role == SubtitleBelow) return m_subtitleBelowTitle;
   const auto *row = item(i);
   if (role == AccessoryText && row && row->accessory) return QString::fromStdString(*row->accessory);
   return {};

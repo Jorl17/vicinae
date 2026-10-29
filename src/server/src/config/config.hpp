@@ -282,6 +282,29 @@ template <> struct Partial<Footer> {
   std::optional<int> height;
 };
 
+// How the root search shows the rows of an extension keyword (for example "calc
+// 2*3"). The defaults show them like any other rows.
+struct KeywordResults {
+  // Once the text goes past the keyword ("m ", "calc 2*3"), show only the
+  // keyword's rows, as Alfred shows only a script filter's rows.
+  bool onlyKeywordRows = false;
+  // Show a row's subtitle under its title instead of after it.
+  bool subtitleBelowTitle = false;
+  // Show the command's name above its rows.
+  bool sectionTitle = true;
+  // Show the status bar while the text is past the keyword.
+  bool statusBar = true;
+
+  bool operator==(const KeywordResults &) const = default;
+};
+
+template <> struct Partial<KeywordResults> {
+  std::optional<bool> onlyKeywordRows;
+  std::optional<bool> subtitleBelowTitle;
+  std::optional<bool> sectionTitle;
+  std::optional<bool> statusBar;
+};
+
 struct TelemetryConfig {
   bool systemInfo = true;
 };
@@ -354,6 +377,7 @@ struct ConfigValue {
   WindowConfig launcherWindow;
   Header header;
   Footer footer;
+  KeywordResults keywordResults;
 
   // we use maps to keep serialized output predictable
   KeybindMap keybinds;
@@ -410,6 +434,7 @@ template <> struct Partial<ConfigValue> {
   std::optional<Partial<WindowConfig>> launcherWindow;
   std::optional<Partial<Header>> header;
   std::optional<Partial<Footer>> footer;
+  std::optional<Partial<KeywordResults>> keywordResults;
 
   std::optional<KeybindMap> keybinds;
 
@@ -500,6 +525,7 @@ SNAKE_CASIFY(config::TelemetryConfig);
 SNAKE_CASIFY(config::WindowCSD);
 SNAKE_CASIFY(config::ClockConfig);
 SNAKE_CASIFY(config::GlobalShortcuts);
+SNAKE_CASIFY(config::KeywordResults);
 
 #undef SNAKE_CASIFY
 

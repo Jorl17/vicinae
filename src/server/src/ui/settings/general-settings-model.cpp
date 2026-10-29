@@ -152,6 +152,27 @@ void GeneralSettingsModel::setFitToContent(bool v) {
            .fitToContent = config::Partial<config::WindowFitToContent>{.enabled = v}}});
 }
 
+bool GeneralSettingsModel::keywordOnlyRows() const { return cfg().keywordResults.onlyKeywordRows; }
+void GeneralSettingsModel::setKeywordOnlyRows(bool v) {
+  cfgManager().mergeWithUser({.keywordResults = config::Partial<config::KeywordResults>{.onlyKeywordRows = v}});
+}
+
+bool GeneralSettingsModel::keywordSubtitleBelow() const { return cfg().keywordResults.subtitleBelowTitle; }
+void GeneralSettingsModel::setKeywordSubtitleBelow(bool v) {
+  cfgManager().mergeWithUser(
+      {.keywordResults = config::Partial<config::KeywordResults>{.subtitleBelowTitle = v}});
+}
+
+bool GeneralSettingsModel::keywordSectionTitle() const { return cfg().keywordResults.sectionTitle; }
+void GeneralSettingsModel::setKeywordSectionTitle(bool v) {
+  cfgManager().mergeWithUser({.keywordResults = config::Partial<config::KeywordResults>{.sectionTitle = v}});
+}
+
+bool GeneralSettingsModel::keywordStatusBar() const { return cfg().keywordResults.statusBar; }
+void GeneralSettingsModel::setKeywordStatusBar(bool v) {
+  cfgManager().mergeWithUser({.keywordResults = config::Partial<config::KeywordResults>{.statusBar = v}});
+}
+
 bool GeneralSettingsModel::floatingStatusBar() const { return cfg().launcherWindow.floatingStatusBar; }
 void GeneralSettingsModel::setFloatingStatusBar(bool v) {
   cfgManager().mergeWithUser(

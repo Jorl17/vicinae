@@ -34,6 +34,8 @@ public:
 private:
   void refresh();
   bool rerunSearch();
+  void applyKeywordResultsSettings();
+  bool onlyKeywordRows() const;
   void startCalculator();
   void startFileSearch();
   void handleFileSearchFinished();

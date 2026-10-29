@@ -239,6 +239,51 @@ Flickable {
             }
         }
 
+        SettingsSectionLabel {
+            text: qsTr("Keyword results")
+            Layout.topMargin: 24
+            Layout.bottomMargin: 10
+        }
+
+        SettingsGroup {
+            SettingsRow {
+                label: qsTr("Only the keyword's rows")
+                description: qsTr("Once the search goes past an extension keyword, as in \"calc 2*3\", show only that keyword's rows.")
+                SettingsToggle {
+                    checked: root.model.keywordOnlyRows
+                    onToggled: checked => root.model.keywordOnlyRows = checked
+                }
+            }
+
+            SettingsRow {
+                label: qsTr("Subtitle below the title")
+                description: qsTr("Show the subtitle of a keyword row on a second line, under its title.")
+                SettingsToggle {
+                    checked: root.model.keywordSubtitleBelow
+                    onToggled: checked => root.model.keywordSubtitleBelow = checked
+                }
+            }
+
+            SettingsRow {
+                label: qsTr("Command name above the rows")
+                description: qsTr("Show the name of the keyword's command as a header above its rows.")
+                SettingsToggle {
+                    checked: root.model.keywordSectionTitle
+                    onToggled: checked => root.model.keywordSectionTitle = checked
+                }
+            }
+
+            SettingsRow {
+                label: qsTr("Status bar")
+                description: qsTr("Show the status bar while the search goes past an extension keyword.")
+                showSeparator: false
+                SettingsToggle {
+                    checked: root.model.keywordStatusBar
+                    onToggled: checked => root.model.keywordStatusBar = checked
+                }
+            }
+        }
+
         Item {
             Layout.preferredHeight: 24
         }

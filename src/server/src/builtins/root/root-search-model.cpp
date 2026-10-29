@@ -41,8 +41,12 @@ RootSearchModel::RootSearchModel(const ViewScope &scope, QObject *parent)
   connect(&m_fileWatcher, &FileSearchWatcher::finished, this, &RootSearchModel::handleFileSearchFinished);
 
   connect(m_config, &config::Manager::configChanged, this,
-          [this](const config::ConfigValue &next, const config::ConfigValue &) {
+          [this](const config::ConfigValue &next, const config::ConfigValue &prev) {
             m_fileSearchEnabled = next.searchFilesInRoot;
+            if (next.keywordResults != prev.keywordResults) {
+              applyKeywordResultsSettings();
+              refresh();
+            }
           });
 
   connect(m_manager, &RootItemManager::metadataChanged, this, &RootSearchModel::refresh);
@@ -88,6 +92,7 @@ void RootSearchModel::setFilter(const QString &text) {
   scope().clearActions();
 
   m_keywordSource->setState(m_keywordSearch->setText(m_query));
+  applyKeywordResultsSettings();
 
   m_calcSource->setResult({});
   if (!fileSearchApplicable()) {
@@ -107,8 +112,38 @@ void RootSearchModel::refresh() {
   refreshActionPanel();
 }
 
+// The keyword_results settings: the look of the keyword's rows, and the
+// status bar while the text goes past a keyword.
+void RootSearchModel::applyKeywordResultsSettings() {
+  const auto &settings = m_config->value().keywordResults;
+  m_keywordSource->setLook(settings.sectionTitle, settings.subtitleBelowTitle);
+  scope().setStatusBarVisible(settings.statusBar || !m_keywordSearch->engaged());
+}
+
+bool RootSearchModel::onlyKeywordRows() const {
+  return m_keywordSearch->engaged() && m_config->value().keywordResults.onlyKeywordRows;
+}
+
 bool RootSearchModel::rerunSearch() {
   auto text = QString::fromStdString(m_query);
+
+  // Past a keyword ("m ", "calc 2*3"), the keyword's rows are the only rows.
+  if (onlyKeywordRows()) {
+    m_fileSearchDebounce.stop();
+    m_updateSource->setUpdate({});
+    m_linkSource->setLink({});
+    m_calcSource->setResult({});
+    m_newsSource->setItems({});
+    m_favoritesSource->setItems({});
+    m_resultsSource->setItems({});
+    m_resultsSource->setQueryEmpty(false);
+    m_filesSource->setFiles({});
+    m_hasFileResults = false;
+    m_fallbackSource->setItems({});
+    scope().setLoading(false);
+    rebuild();
+    return false;
+  }
 
   if (isAbsolutePathLike(text)) {
     std::error_code ec;
@@ -254,7 +289,7 @@ void RootSearchModel::startFileSearch() {
 }
 
 void RootSearchModel::handleFileSearchFinished() {
-  if (!m_fileWatcher.isFinished() || m_fileSearchQuery != m_query) return;
+  if (!m_fileWatcher.isFinished() || m_fileSearchQuery != m_query || onlyKeywordRows()) return;
   scope().setLoading(false);
   m_filesSource->setFiles(m_fileWatcher.result());
   m_fileSearchQuery.clear();

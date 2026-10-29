@@ -34,6 +34,10 @@ class GeneralSettingsModel : public QObject {
   Q_PROPERTY(QString csdShadowSize READ csdShadowSize WRITE setCsdShadowSize NOTIFY configChanged)
   Q_PROPERTY(bool compactMode READ compactMode WRITE setCompactMode NOTIFY configChanged)
   Q_PROPERTY(bool fitToContent READ fitToContent WRITE setFitToContent NOTIFY configChanged)
+  Q_PROPERTY(bool keywordOnlyRows READ keywordOnlyRows WRITE setKeywordOnlyRows NOTIFY configChanged)
+  Q_PROPERTY(bool keywordSubtitleBelow READ keywordSubtitleBelow WRITE setKeywordSubtitleBelow NOTIFY configChanged)
+  Q_PROPERTY(bool keywordSectionTitle READ keywordSectionTitle WRITE setKeywordSectionTitle NOTIFY configChanged)
+  Q_PROPERTY(bool keywordStatusBar READ keywordStatusBar WRITE setKeywordStatusBar NOTIFY configChanged)
   Q_PROPERTY(bool floatingStatusBar READ floatingStatusBar WRITE setFloatingStatusBar NOTIFY configChanged)
   Q_PROPERTY(QString windowOpacity READ windowOpacity WRITE setWindowOpacity NOTIFY configChanged)
   Q_PROPERTY(
@@ -95,6 +99,15 @@ public:
   void setCompactMode(bool v);
   bool fitToContent() const;
   void setFitToContent(bool v);
+  // keyword_results: how the rows of an extension keyword show in the root search.
+  bool keywordOnlyRows() const;
+  void setKeywordOnlyRows(bool v);
+  bool keywordSubtitleBelow() const;
+  void setKeywordSubtitleBelow(bool v);
+  bool keywordSectionTitle() const;
+  void setKeywordSectionTitle(bool v);
+  bool keywordStatusBar() const;
+  void setKeywordStatusBar(bool v);
   bool floatingStatusBar() const;
   void setFloatingStatusBar(bool v);
   QString windowOpacity() const;

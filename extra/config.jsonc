@@ -238,6 +238,19 @@
 		// "action.save": "control+S"
 	},
 
+	// How the root search shows the rows of an extension keyword, for example "calc 2*3". The defaults show them
+	// like any other rows. Set all four to the other value for the look of Alfred's script filters.
+	"keyword_results": {
+		// Once the text goes past the keyword ("m ", "calc 2*3"), show only the keyword's rows.
+		"only_keyword_rows": false,
+		// Show a row's subtitle under its title instead of after it.
+		"subtitle_below_title": false,
+		// Show the command's name above its rows.
+		"section_title": true,
+		// Show the status bar while the text is past the keyword.
+		"status_bar": true
+	},
+
 	// List of entrypoints that are tagged as "favorite".
 	// They show up on the very top of the root search when no search query is active.
 	// Each value is a serialized entrypoint ID.

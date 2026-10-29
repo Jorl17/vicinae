@@ -5,7 +5,7 @@ import Vicinae
 
 SelectableDelegate {
     id: root
-    height: 38
+    height: subtitleBelow ? 50 : 38
 
     Accessible.role: Accessible.ListItem
     Accessible.name: itemTitle
@@ -21,6 +21,9 @@ SelectableDelegate {
     required property bool itemIsActive
     property var itemAccessory: []
     property string itemAccessoryColor: ""
+    // Show the subtitle on a second line, under the title, in a smaller font,
+    // with a larger icon (the keyword_results settings).
+    property bool subtitleBelow: false
 
     RowLayout {
         anchors.fill: parent
@@ -30,8 +33,8 @@ SelectableDelegate {
 
         Item {
             visible: root.itemIconSource !== ""
-            Layout.preferredWidth: 26
-            Layout.preferredHeight: 26
+            Layout.preferredWidth: root.subtitleBelow ? 32 : 26
+            Layout.preferredHeight: root.subtitleBelow ? 32 : 26
             Layout.alignment: Qt.AlignVCenter
 
             ViciImage {
@@ -56,18 +59,20 @@ SelectableDelegate {
             id: textRow
             Layout.fillWidth: true
             Layout.minimumWidth: 100
-            implicitHeight: titleText.implicitHeight
+            implicitHeight: twoLines ? titleText.implicitHeight + subtitleText.anchors.topMargin + subtitleText.implicitHeight : titleText.implicitHeight
 
+            readonly property bool twoLines: root.subtitleBelow && subtitleText.visible
             readonly property real spacing: root.appearance.rowTextSpacing
             readonly property real shortcutLeadingSpace: 8
             readonly property real aliasSpace: (aliasBadge.visible ? aliasBadge.width + spacing : 0) + (shortcutBadge.visible ? shortcutBadge.width + spacing + shortcutLeadingSpace : 0)
             readonly property real availableForText: width - aliasSpace
-            readonly property real subtitleReserved: subtitleText.visible ? Math.min(subtitleText.implicitWidth + spacing, availableForText * 0.5) : 0
+            readonly property real subtitleReserved: subtitleText.visible && !root.subtitleBelow ? Math.min(subtitleText.implicitWidth + spacing, availableForText * 0.5) : 0
 
             Text {
                 id: titleText
                 anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
+                anchors.verticalCenter: textRow.twoLines ? undefined : parent.verticalCenter
+                anchors.top: textRow.twoLines ? parent.top : undefined
                 width: Math.min(implicitWidth, textRow.availableForText - textRow.subtitleReserved)
                 text: root.itemTitle
                 color: root.selected ? root.appearance.selectedText : root.hovered ? root.appearance.hoveredText : Theme.foreground
@@ -79,13 +84,15 @@ SelectableDelegate {
             Text {
                 id: subtitleText
                 visible: root.itemSubtitle !== ""
-                anchors.left: titleText.right
-                anchors.leftMargin: visible ? textRow.spacing : 0
-                anchors.baseline: titleText.baseline
-                width: Math.min(implicitWidth, Math.max(0, textRow.availableForText - titleText.width - textRow.spacing))
+                anchors.left: root.subtitleBelow ? parent.left : titleText.right
+                anchors.leftMargin: visible && !root.subtitleBelow ? textRow.spacing : 0
+                anchors.baseline: root.subtitleBelow ? undefined : titleText.baseline
+                anchors.top: root.subtitleBelow ? titleText.bottom : undefined
+                anchors.topMargin: root.subtitleBelow ? 1 : 0
+                width: root.subtitleBelow ? Math.min(implicitWidth, textRow.availableForText) : Math.min(implicitWidth, Math.max(0, textRow.availableForText - titleText.width - textRow.spacing))
                 text: root.itemSubtitle
                 color: root.selected ? root.appearance.selectedSecondaryText : root.hovered ? root.appearance.hoveredSecondaryText : Theme.textMuted
-                font.pointSize: Theme.regularFontSize
+                font.pointSize: root.subtitleBelow ? Theme.smallerFontSize : Theme.regularFontSize
                 elide: Text.ElideRight
                 maximumLineCount: 1
             }
@@ -93,18 +100,18 @@ SelectableDelegate {
             TextBadge {
                 id: aliasBadge
                 visible: root.itemAlias !== ""
-                anchors.left: subtitleText.visible ? subtitleText.right : titleText.right
+                anchors.left: subtitleText.visible && !root.subtitleBelow ? subtitleText.right : titleText.right
                 anchors.leftMargin: visible ? textRow.spacing : 0
-                anchors.verticalCenter: parent.verticalCenter
+                anchors.verticalCenter: root.subtitleBelow ? titleText.verticalCenter : parent.verticalCenter
                 text: root.itemAlias
             }
 
             ShortcutBadge {
                 id: shortcutBadge
                 visible: root.itemShortcutTokens.length > 0
-                anchors.left: aliasBadge.visible ? aliasBadge.right : (subtitleText.visible ? subtitleText.right : titleText.right)
+                anchors.left: aliasBadge.visible ? aliasBadge.right : (subtitleText.visible && !root.subtitleBelow ? subtitleText.right : titleText.right)
                 anchors.leftMargin: visible ? textRow.spacing + textRow.shortcutLeadingSpace : 0
-                anchors.verticalCenter: parent.verticalCenter
+                anchors.verticalCenter: root.subtitleBelow ? titleText.verticalCenter : parent.verticalCenter
                 tokens: root.itemShortcutTokens
             }
         }
