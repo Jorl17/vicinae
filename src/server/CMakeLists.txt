@@ -429,6 +429,8 @@ set(SRCS
 	src/log/message-handler.cpp
 
 	src/extension/extension-command-runtime.cpp
+	src/extension/extension-api-server.hpp
+	src/extension/extension-api-server.cpp
 	src/extension/extension-load-options.hpp
 	src/extension/extension-load-options.cpp
 	src/extension/api/ui-service.hpp
@@ -545,6 +547,8 @@ set(SRCS
 	src/builtins/root/root-search-model.cpp
 	src/builtins/root/root-keyword-search.hpp
 	src/builtins/root/root-keyword-search.cpp
+	src/builtins/root/keyword-api-session.hpp
+	src/builtins/root/keyword-api-session.cpp
 	src/builtins/root/keyword-match.hpp
 	src/builtins/root/keyword-match.cpp
 	src/builtins/root/root-search-sources.hpp

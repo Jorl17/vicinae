@@ -70,9 +70,10 @@ struct KeywordItem {
 };
 
 // We wrap the rows in a struct, because figura does not generate list return types
-// for TypeScript.
+// for TypeScript. When the handler fails, error says why and there are no rows.
 struct KeywordRows {
   items: KeywordItem[];
+  error?: string;
 };
 
 // The text of the HUD that we show after a Run action, or the error message.
@@ -99,8 +100,11 @@ service Manager {
 
   // Run the keyword handler of a command (opts.entrypoint) with the text typed
   // after the keyword. A newer query for the same command cancels the older one,
-  // which then returns no rows.
-  fn queryKeyword(opts: LoadOptions, query: string) => KeywordRows;
+  // which then returns no rows. The API calls of the handler, such as
+  // getFrontmostApplication, come as extensionMessage events of session_id, and
+  // their answers go back with messageExtension, as for a loaded command. The
+  // caller picks session_id and keeps it for the command.
+  fn queryKeyword(session_id: string, opts: LoadOptions, query: string) => KeywordRows;
 
   // Run an action of type Run from the rows of the last keyword query of the command.
   fn runKeywordAction(opts: LoadOptions, action_id: string) => KeywordActionResult;

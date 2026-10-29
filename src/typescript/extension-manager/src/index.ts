@@ -197,10 +197,11 @@ class ExtensionManager extends manager.ManagerService {
 	}
 
 	async queryKeyword(
+		session_id: string,
 		opts: manager.LoadOptions,
 		query: string,
 	): Promise<manager.KeywordRows> {
-		return { items: await this.keywordWorkers.query(opts, query) };
+		return this.keywordWorkers.query(session_id, opts, query);
 	}
 
 	async runKeywordAction(
@@ -215,8 +216,11 @@ class ExtensionManager extends manager.ManagerService {
 		payload: string,
 	): Promise<boolean> {
 		const worker = this.workerMap.get(session_id);
-		worker?.client.Lifecycle.send_message(payload);
-		return true;
+		if (worker) {
+			worker.client.Lifecycle.send_message(payload);
+			return true;
+		}
+		return this.keywordWorkers.message(session_id, payload);
 	}
 
 	private createWorker(environment: EnvironmentType): Worker {
@@ -263,6 +267,7 @@ class ExtensionManager extends manager.ManagerService {
 	private readonly keywordWorkers = new KeywordWorkers(
 		() => this.createWorker("production"),
 		logger,
+		(sessionId, data) => this.emit_extensionMessage(sessionId, data),
 	);
 }
 

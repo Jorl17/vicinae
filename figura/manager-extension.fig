@@ -66,9 +66,10 @@ struct KeywordItem {
 };
 
 // We wrap the rows in a struct, because figura does not generate list return types
-// for TypeScript.
+// for TypeScript. When the handler fails, error says why and there are no rows.
 struct KeywordRows {
   items: KeywordItem[];
+  error?: string;
 };
 
 // The text of the HUD that we show after a Run action, or the error message.

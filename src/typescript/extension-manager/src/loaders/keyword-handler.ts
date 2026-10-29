@@ -25,12 +25,13 @@ const errorMessage = (error: unknown) =>
 
 /**
  * Run the keyword handler of one command. A new query aborts the signal of the
- * query before it, and we return no rows for the aborted query. We keep the
+ * query before it, and we return no rows for the aborted query. When the handler
+ * fails, we return its error, so that Vicinae can show it. We keep the
  * functions of the run actions in the rows of the last query, so that Vicinae
  * can run one of them by its id.
  */
 export class KeywordQueries {
-	async run(entrypoint: string, query: string): Promise<proto.KeywordItem[]> {
+	async run(entrypoint: string, query: string): Promise<proto.KeywordRows> {
 		this.current?.abort();
 		const controller = new AbortController();
 		this.current = controller;
@@ -41,12 +42,14 @@ export class KeywordQueries {
 				throw error;
 			});
 			const handler = await this.handler;
-			if (controller.signal.aborted) return [];
+			if (controller.signal.aborted) return { items: [] };
 			const items = await handler(query, { signal: controller.signal });
-			return controller.signal.aborted ? [] : this.toProtocol(items ?? []);
+			if (controller.signal.aborted) return { items: [] };
+			return { items: this.toProtocol(items ?? []) };
 		} catch (error) {
-			if (!controller.signal.aborted) console.error(error);
-			return [];
+			if (controller.signal.aborted) return { items: [] };
+			console.error(error);
+			return { items: [], error: errorMessage(error) };
 		}
 	}
 

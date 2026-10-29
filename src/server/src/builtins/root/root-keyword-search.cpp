@@ -3,6 +3,7 @@
 #include <QFutureWatcher>
 #include <filesystem>
 #include "actions/clipboard-actions.hpp"
+#include "builtins/root/keyword-api-session.hpp"
 #include "builtins/root/keyword-match.hpp"
 #include "builtins/root/root-search-sources.hpp"
 #include "extension/extension-command.hpp"
@@ -81,9 +82,9 @@ private:
 
 } // namespace
 
-RootKeywordSearch::RootKeywordSearch(const ServiceRegistry &services, QObject *parent)
-    : QObject(parent), m_services(services), m_rootItems(services.rootItemManager()),
-      m_extensions(services.extensionManager()) {
+RootKeywordSearch::RootKeywordSearch(ApplicationContext &ctx, QObject *parent)
+    : QObject(parent), m_ctx(ctx), m_services(*ctx.services), m_rootItems(m_services.rootItemManager()),
+      m_extensions(m_services.extensionManager()) {
   m_queueDelay.setSingleShot(true);
   connect(&m_queueDelay, &QTimer::timeout, this, &RootKeywordSearch::sendPendingQuery);
   connect(m_rootItems, &RootItemManager::itemsChanged, this, &RootKeywordSearch::indexCommands);
@@ -145,12 +146,14 @@ const KeywordState &RootKeywordSearch::setText(std::string_view text) {
     return QString::fromStdString(s);
   });
 
+  m_keywordRow = KeywordPlaceholder{.title = title, .subtitle = subtitle, .completion = completion};
+
   if (!found->query) {
     m_queueDelay.stop();
     m_pendingQuery.reset();
     m_wantsRows = false;
     m_state.items.clear();
-    m_state.placeholder = KeywordPlaceholder{.title = title, .subtitle = subtitle, .completion = completion};
+    m_state.placeholder = m_keywordRow;
     return m_state;
   }
 
@@ -158,8 +161,8 @@ const KeywordState &RootKeywordSearch::setText(std::string_view text) {
   // query until the next rows arrive, as Alfred does.
   m_wantsRows = true;
   if (m_state.items.empty()) {
-    m_state.placeholder = KeywordPlaceholder{
-        .title = title, .subtitle = keyword.runningSubtitle.value_or(subtitle), .completion = completion};
+    m_state.placeholder = m_keywordRow;
+    m_state.placeholder->subtitle = keyword.runningSubtitle.value_or(subtitle);
   }
 
   m_pendingQuery = std::move(found->query);
@@ -195,7 +198,23 @@ void RootKeywordSearch::sendPendingQuery() {
   });
 
   auto opts = keywordLoadOptions(*command, m_services);
-  watcher->setFuture(m_extensions->client().manager()->queryKeyword(opts, query));
+  auto const &session = apiSession(command);
+  watcher->setFuture(m_extensions->client().manager()->queryKeyword(session.id(), opts, query));
+}
+
+// The session of a command lives as long as the keyword search, so that the
+// handler can call the API again in later queries. A new build of the extension
+// gives a new command, which gets a new session.
+KeywordApiSession &RootKeywordSearch::apiSession(const std::shared_ptr<ExtensionCommand> &command) {
+  auto &session = m_sessions[command->uniqueId()];
+
+  if (session && session->command() != command) {
+    session->deleteLater();
+    session = nullptr;
+  }
+  if (!session) session = new KeywordApiSession(command, m_ctx, this);
+
+  return *session;
 }
 
 void RootKeywordSearch::handleReply(std::uint64_t id, std::uint64_t generation,
@@ -205,17 +224,31 @@ void RootKeywordSearch::handleReply(std::uint64_t id, std::uint64_t generation,
 
   if (id == m_runningQuery) m_runningQuery = 0;
 
-  if (!result) {
-    qWarning() << "Keyword query failed for" << command->name() << result.error();
-  } else if (command == m_state.command && m_wantsRows) {
-    // In terminate mode a newer query replaces this one, and in wait mode we show
-    // these rows until the rows of the newest text arrive.
-    bool const current = generation == m_generation;
-    if (current || command->manifest().keyword->queueMode == QueueMode::Wait) {
+  if (!result) qWarning() << "Keyword query failed for" << command->name() << result.error();
+
+  // In terminate mode a newer query replaces this one, and in wait mode we show
+  // these rows until the rows of the newest text arrive.
+  bool const current = generation == m_generation;
+  bool const shown = current || command->manifest().keyword->queueMode == QueueMode::Wait;
+
+  if (command == m_state.command && m_wantsRows && shown) {
+    if (result && !result->items.empty()) {
       m_state.items = std::move(result->items);
       m_state.placeholder.reset();
-      emit stateChanged(m_state);
+    } else {
+      // Without rows, the keyword row says why, as Alfred does when a script
+      // filter returns nothing.
+      m_state.items.clear();
+      m_state.placeholder = m_keywordRow;
+      if (!result) {
+        m_state.placeholder->subtitle = QString::fromStdString(result.error());
+      } else if (result->error) {
+        m_state.placeholder->subtitle = QString::fromStdString(*result->error);
+      } else {
+        m_state.placeholder->subtitle = tr("No results");
+      }
     }
+    emit stateChanged(m_state);
   }
 
   sendPendingQuery();

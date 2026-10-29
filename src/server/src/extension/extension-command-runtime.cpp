@@ -43,30 +43,8 @@ void ExtensionCommandRuntime::initialize() {
 
   m_isDevMode = manager->hasDevelopmentSession(m_command->extensionId());
 
-  QString const storageNamespace = QString("%1:data").arg(m_command->uniqueId().provider.c_str());
-
-  auto services = context()->services;
-  auto &ctx = *context();
-
-  auto *eventCore = new ExtEventCoreService(*m_transport);
-  auto *app = new ExtApplicationService(*m_transport, *services->appDb());
-  auto *ui = new ExtUIService(*m_transport, context()->navigation.get(), m_command, eventCore,
-                              *services->toastService(), *services->selectionService());
-  auto *wm = new ExtWindowManagementService(*m_transport, *services->windowManager(), *services->appDb(),
-                                            *services->appRuntime(), *ctx.navigation);
-  auto *clipboard = new ExtClipboardService(*m_transport, *services->clipman(), *services->pasteService());
-  auto *storage = new ExtStorageService(*m_transport, *services->localStorage(), storageNamespace);
-  auto *fileSearch = new ExtFileSearchService(*m_transport, *services->fileService());
-  auto *command = new ExtCommandService(*m_transport, m_command, services->rootItemManager(), *ctx.settings,
-                                        *ctx.navigation);
-  auto *oauth = new ExtOAuthService(*m_transport, m_command->extensionId(), ctx);
-  auto wallpaper = new ExtWallpaperService(*m_transport, *services->wallpaperManager());
-  auto browserExtension = new ExtBrowserExtensionService(*m_transport, *services->browserExtension());
-
-  m_server = new tsapi::Server(*m_transport, app, ui, wm, clipboard, storage, fileSearch, command, oauth,
-                               wallpaper, browserExtension, eventCore);
+  m_server = createExtensionApiServer(*m_transport, m_command, *context(), this);
   m_server->setLogger(m_logger.get());
-  m_server->setParent(this);
 }
 
 void ExtensionCommandRuntime::load(const LaunchProps &props) {

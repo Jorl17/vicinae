@@ -11,6 +11,11 @@
  * handler returns, and when to run the handler, with the meaning of the same
  * settings of an Alfred script filter.
  *
+ * A handler can call the rest of the API, for example `getFrontmostApplication`,
+ * which gives the app that was in front before Vicinae opened. When the handler
+ * returns no rows, the keyword row says "No results", and when it throws, the
+ * keyword row shows the error message.
+ *
  * This is a Vicinae extension of the Raycast API.
  */
 

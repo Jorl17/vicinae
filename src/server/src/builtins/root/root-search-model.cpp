@@ -54,7 +54,7 @@ RootSearchModel::RootSearchModel(const ViewScope &scope, QObject *parent)
     if (rowCount() > 0) emit dataChanged(index(0), index(rowCount() - 1), {IconSource, AccessoryColor});
   });
 
-  m_keywordSearch = new RootKeywordSearch(*scope.services(), this);
+  m_keywordSearch = new RootKeywordSearch(*scope.appContext(), this);
   connect(m_keywordSearch, &RootKeywordSearch::stateChanged, this, &RootSearchModel::handleKeywordState);
 
   m_keywordSource = new RootKeywordSection;

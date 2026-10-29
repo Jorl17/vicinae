@@ -56,7 +56,7 @@ class Lifecycle extends extensionServer.LifecycleService {
 		}
 
 		globalState.preferences = data.preferenceValues;
-		return { items: await keywordQueries.run(data.entrypoint, query) };
+		return keywordQueries.run(data.entrypoint, query);
 	}
 
 	async run_keyword_action(

@@ -32,6 +32,8 @@ const withTimeout = async <T>(
 type KeywordWorker = {
 	worker: Worker;
 	client: extension.Client;
+	// The session of the last query, which receives the API calls of the handler.
+	sessionId?: string;
 	// the modification time of the handler file when we started the worker
 	builtAt: number;
 	idleTimer?: NodeJS.Timeout;
@@ -42,17 +44,23 @@ type KeywordWorker = {
  * the root search. Each command gets its own worker, so that a handler can keep
  * its data loaded between key presses. We stop a worker after ten minutes
  * without queries.
+ *
+ * A handler can call the Vicinae API, as a loaded command does: we send its
+ * messages to Vicinae as messages of the session of the last query (see
+ * queryKeyword in manager.fig), and Vicinae answers through message().
  */
 export class KeywordWorkers {
 	constructor(
 		private readonly spawn: () => Worker,
 		private readonly logger: Logger,
+		private readonly sendToVicinae: (sessionId: string, data: string) => void,
 	) {}
 
 	async query(
+		sessionId: string,
 		load: manager.LoadOptions,
 		query: string,
-	): Promise<manager.KeywordItem[]> {
+	): Promise<manager.KeywordRows> {
 		const key = `${load.extension_id}:${load.command_name}`;
 		const sequence = (this.latest.get(key) ?? 0) + 1;
 		this.latest.set(key, sequence);
@@ -66,8 +74,9 @@ export class KeywordWorkers {
 
 		// The file operations above finish in any order, so a newer query can get
 		// here first. We send only the newest query to the worker.
-		if (this.latest.get(key) !== sequence) return [];
+		if (this.latest.get(key) !== sequence) return { items: [] };
 
+		entry.sessionId = sessionId;
 		clearTimeout(entry.idleTimer);
 		entry.idleTimer = setTimeout(() => this.stop(key), IDLE_TIMEOUT_MS);
 
@@ -75,7 +84,22 @@ export class KeywordWorkers {
 			entry.client.Lifecycle.query_keyword(data, query),
 			() => this.logger.error(`keyword query for ${key} timed out`),
 		);
-		return rows?.items ?? [];
+		return (
+			rows ?? {
+				items: [],
+				error: `The command did not answer within ${QUERY_TIMEOUT_MS / 1000} seconds`,
+			}
+		);
+	}
+
+	/** Pass a message from Vicinae to the worker whose handler runs in its session. */
+	message(sessionId: string, data: string): boolean {
+		for (const entry of this.workers.values()) {
+			if (entry.sessionId !== sessionId) continue;
+			entry.client.Lifecycle.send_message(data);
+			return true;
+		}
+		return false;
 	}
 
 	/** Run an action from the rows of the last query of a command. */
@@ -104,7 +128,12 @@ export class KeywordWorkers {
 			builtAt,
 		};
 
-		worker.on("message", (data) => entry.client.route(data));
+		// As for a loaded command, a message is either the answer of the worker to
+		// the manager or a call of the Vicinae API.
+		worker.on("message", (data) => {
+			entry.client.route(data);
+			if (entry.sessionId) this.sendToVicinae(entry.sessionId, data);
+		});
 		worker.stdout.resume();
 		worker.stderr.on("data", (buf: Buffer) => {
 			this.logger.error(`${key}: ${buf.toString().trimEnd()}`);

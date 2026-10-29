@@ -13,8 +13,10 @@
 #include <unordered_map>
 #include <vector>
 
+struct ApplicationContext;
 class ExtensionCommand;
 class ExtensionManager;
+class KeywordApiSession;
 class RootItemManager;
 class ServiceRegistry;
 
@@ -28,8 +30,9 @@ struct KeywordPlaceholder {
 };
 
 /* What the root search shows for the keyword of an extension command: the rows
- * that its keyword handler returned for the last query, or the placeholder row
- * when there are no rows yet. */
+ * that its keyword handler returned for the last query, or else the placeholder
+ * row. The placeholder says that the rows are coming, that there are none or why
+ * the handler failed, so that the keyword always shows a row, as in Alfred. */
 struct KeywordState {
   std::shared_ptr<ExtensionCommand> command;
   std::vector<manager::KeywordItem> items;
@@ -47,7 +50,7 @@ signals:
   void stateChanged(const KeywordState &state) const;
 
 public:
-  explicit RootKeywordSearch(const ServiceRegistry &services, QObject *parent = nullptr);
+  explicit RootKeywordSearch(ApplicationContext &ctx, QObject *parent = nullptr);
 
   const KeywordState &setText(std::string_view text);
 
@@ -59,18 +62,24 @@ private:
   };
 
   void indexCommands();
+  KeywordApiSession &apiSession(const std::shared_ptr<ExtensionCommand> &command);
   std::optional<Match> match(std::string_view text) const;
   void sendPendingQuery();
   void handleReply(std::uint64_t id, std::uint64_t generation,
                    const std::shared_ptr<ExtensionCommand> &command,
                    std::expected<manager::KeywordRows, std::string> result);
 
+  ApplicationContext &m_ctx;
   const ServiceRegistry &m_services;
   RootItemManager *m_rootItems;
   ExtensionManager *m_extensions;
   std::unordered_map<std::string, std::shared_ptr<ExtensionCommand>> m_commands;
+  // The API session of each command whose handler ran, by the unique id of the command.
+  std::unordered_map<std::string, KeywordApiSession *> m_sessions;
 
   KeywordState m_state;
+  // The placeholder row for the current text, before the handler gives its rows.
+  KeywordPlaceholder m_keywordRow;
   // Whether the current text asks for rows, which it does not while a required argument is missing.
   bool m_wantsRows = false;
   std::optional<std::string> m_pendingQuery;
