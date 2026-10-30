@@ -86,13 +86,15 @@ SelectableDelegate {
                 maximumLineCount: 1
             }
 
+            // Placed by position in both layouts, never by anchors: a delegate is
+            // reused for rows of either layout, and an anchor turned off by a
+            // binding is not reliably released, which left the subtitle on the
+            // title's line in reused rows.
             Text {
                 id: subtitleText
                 visible: root.itemSubtitle !== ""
-                anchors.left: root.subtitleBelow ? parent.left : titleText.right
-                anchors.leftMargin: visible && !root.subtitleBelow ? textRow.spacing : 0
-                anchors.baseline: root.subtitleBelow ? undefined : titleText.baseline
-                y: root.subtitleBelow ? titleText.y + titleText.implicitHeight + textRow.lineGap : 0
+                x: root.subtitleBelow ? 0 : titleText.x + titleText.width + textRow.spacing
+                y: root.subtitleBelow ? titleText.y + titleText.implicitHeight + textRow.lineGap : titleText.y + titleText.baselineOffset - baselineOffset
                 width: root.subtitleBelow ? Math.min(implicitWidth, textRow.availableForText) : Math.min(implicitWidth, Math.max(0, textRow.availableForText - titleText.width - textRow.spacing))
                 text: root.itemSubtitle
                 color: root.selected ? root.appearance.selectedSecondaryText : root.hovered ? root.appearance.hoveredSecondaryText : Theme.textMuted
@@ -106,7 +108,7 @@ SelectableDelegate {
                 visible: root.itemAlias !== ""
                 anchors.left: subtitleText.visible && !root.subtitleBelow ? subtitleText.right : titleText.right
                 anchors.leftMargin: visible ? textRow.spacing : 0
-                anchors.verticalCenter: root.subtitleBelow ? titleText.verticalCenter : parent.verticalCenter
+                anchors.verticalCenter: titleText.verticalCenter
                 text: root.itemAlias
             }
 
@@ -115,7 +117,7 @@ SelectableDelegate {
                 visible: root.itemShortcutTokens.length > 0
                 anchors.left: aliasBadge.visible ? aliasBadge.right : (subtitleText.visible && !root.subtitleBelow ? subtitleText.right : titleText.right)
                 anchors.leftMargin: visible ? textRow.spacing + textRow.shortcutLeadingSpace : 0
-                anchors.verticalCenter: root.subtitleBelow ? titleText.verticalCenter : parent.verticalCenter
+                anchors.verticalCenter: titleText.verticalCenter
                 tokens: root.itemShortcutTokens
             }
         }
